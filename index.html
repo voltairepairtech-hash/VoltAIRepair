@@ -1,50 +1,64 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VoltAIRepair</title>
-  <style>
-    :root{--bg:#0e1117;--fg:#e6edf3;--muted:#8b949e;--card:#161b22;--btn:#1f6feb;}
-    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,Segoe UI,Roboto}
-    header{padding:48px 20px;text-align:center}
-    h1{margin:0 0 8px;font-size:40px}
-    p{margin:0;color:var(--muted)}
-    .wrap{max-width:900px;margin:32px auto;padding:0 20px;display:grid;gap:20px}
-    .card{background:var(--card);border:1px solid #30363d;border-radius:14px;padding:20px}
-    .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px}
-    .btn{background:var(--btn);color:#fff;padding:12px 16px;border-radius:10px;text-decoration:none;font-weight:600}
-    .btn.ghost{background:transparent;border:1px solid #30363d;color:var(--fg)}
-    footer{padding:24px;color:var(--muted);text-align:center}
-  </style>
+  <link rel="stylesheet" href="assets/style.css" />
+  <meta name="description" content="Küresel yapay zeka destekli onarım ve eğitim ekosistemi" />
 </head>
 <body>
-  <header>
-    <h1>VoltAIRepair</h1>
-    <p>Küresel yapay zekâ destekli onarım ve eğitim ekosistemi</p>
-  </header>
+  <div class="container">
+    <nav>
+      <strong class="brand">⚡ VoltAIRepair</strong>
+      <a href="./index.html">Ana Sayfa</a>
+      <a href="./frontend/panel.html">Yönetim Test Paneli</a>
+      <a href="#moduller">Modüller</a>
+      <a href="#kaynak">Kaynaklar</a>
+    </nav>
 
-  <main class="wrap">
-    <section class="card">
-      <h2>Başla</h2>
-      <p>Atlas kitabı, arıza çözümleri, ölçüm teknikleri ve eğitim içerikleri tek panelde.</p>
-      <div class="cta">
-        <a class="btn" href="frontend/panel.html">Yönetim Paneli</a>
-        <a class="btn ghost" href="https://github.com/voltairepairtech-hash/VoltAIRepair">GitHub Deposu</a>
+    <header>
+      <h1>VoltAIRepair</h1>
+      <p class="lead">
+        Yapay zeka destekli <strong>onarım</strong> ve <strong>eğitim</strong> ekosistemi.
+        iPhone Panic Atlas, ölçüm & kısa devre teknikleri, yazılım araçları ve daha fazlası.
+      </p>
+      <span class="badge">Sıfır-sermaye büyüme modeli</span>
+    </header>
+
+    <section id="moduller">
+      <h2>Öne Çıkan Modüller</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>📚 iPhone Panic Atlas</h3>
+          <p>Panic kodları → nedenler, ölçüm adımları, onarım akışları.</p>
+          <span class="badge">iOS 12–17+</span>
+        </div>
+
+        <div class="card">
+          <h3>🧪 Ölçüm & Kısa Devre</h3>
+          <p>Pratik akım çekimi, hat takibi, ısı/termal ve enjeksiyon teknikleri.</p>
+          <span class="badge">Donanım</span>
+        </div>
+
+        <div class="card">
+          <h3>🛠️ Yazılım Araçları</h3>
+          <p>100+ program: log analiz, DFU/restore, baseband/diag, otomasyon.</p>
+          <span class="badge">Araç Seti</span>
+        </div>
+
+        <div class="card">
+          <h3>🌍 Topluluk & Sponsorluk</h3>
+          <p>Açık kaynak dokümantasyon, sponsor/affiliate ekosistemi.</p>
+          <span class="badge">Açık Ekosistem</span>
+        </div>
       </div>
     </section>
 
-    <section class="card">
-      <h3>Öne Çıkan Modüller</h3>
-      <ul>
-        <li>📚 iPhone Panic Atlas (model bazlı arıza & çözüm)</li>
-        <li>🧪 Ölçüm ve kısa devre tespiti rehberi</li>
-        <li>🧩 Parça uyumluluk matrisi</li>
-        <li>🛠️ Yazılım araçları ve kullanım kılavuzları</li>
-      </ul>
+    <section id="kaynak" class="footer">
+      <p>© VoltAIRepair — Fikir Babası: <strong>Hakan Güner</strong></p>
+      <p class="lead">GitHub Pages üzerinde erken erişim önizlemesi.</p>
     </section>
-  </main>
-
-  <footer>© VoltAIRepair — Fikir Babası: Hakan Güner</footer>
+  </div>
 </body>
 </html>
