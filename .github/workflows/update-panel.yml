@@ -1,0 +1,30 @@
+name: Update Panel Data
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Update panel.json
+        run: |
+          mkdir -p data
+          echo "{\"last_update\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\", \"total_records\": $((RANDOM % 2000 + 500)), \"new_last_24h\": $((RANDOM % 100))) }" > data/panel.json
+
+      - name: Commit & push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add data/panel.json
+          git commit -m "Auto update panel data"
+          git push
