@@ -1,48 +1,152 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>VoltAIRepair • Admin Panel</title>
-  <link rel="stylesheet" href="style.css">
+  <!-- GÖMÜLÜ STİL -->
+  <style>
+    :root{
+      --bg:#0b0f1a;--panel:#0f1524;--card:#111b2e;--muted:#9fb2d0;
+      --text:#e9f0ff;--brand:#2fb3ff;--ok:#25d366;--warn:#ffb020;--bad:#ff5d5d;
+      --border:rgba(255,255,255,.06)
+    }
+    *{box-sizing:border-box} html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font:500 16px/1.5 system-ui,-apple-system,Segoe UI,Roboto}
+    .wrap{max-width:1040px;margin:0 auto;padding:24px}
+    .topbar{position:sticky;top:0;z-index:5;background:linear-gradient(var(--bg),transparent 70%);padding:16px 0 6px}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:22px}
+    .brand b{color:var(--brand)}
+    .badge{margin-left:auto;padding:.4rem .6rem;border-radius:999px;background:var(--card);border:1px solid var(--border);color:var(--muted);font-size:13px}
+    .grid{display:grid;gap:16px;margin-top:18px}
+    @media(min-width:740px){.grid{grid-template-columns:repeat(3,1fr)}}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;min-height:140px;display:flex;flex-direction:column;justify-content:center}
+    .card h3{margin:0 0 6px;font-size:14px;color:var(--muted);letter-spacing:.4px}
+    .card .val{font-size:40px;font-weight:800}
+    .rows{display:grid;gap:16px;margin-top:16px}
+    @media(min-width:740px){.rows{grid-template-columns:2fr 1fr}}
+    table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+    th,td{padding:12px 14px;border-bottom:1px solid var(--border);font-size:14px}
+    th{color:var(--muted);text-align:left;font-weight:700}
+    tr:last-child td{border-bottom:none}
+    .muted{color:var(--muted)}
+    .pill{display:inline-block;padding:.25rem .6rem;border-radius:999px;background:#0e2038;border:1px solid var(--border);font-size:12px;color:var(--muted)}
+    .menu{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+    .btn{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:.6rem .85rem;border-radius:10px;text-decoration:none;font-weight:700}
+    .btn.brand{background:#0b2740;border-color:#103a5a;color:#cfeaff}
+    .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+    .hint{font-size:13px;color:var(--muted);margin-top:6px}
+    footer{margin:28px 0 12px;color:var(--muted);font-size:13px}
+  </style>
 </head>
-
 <body>
-  <header>
-    <h1>⚙️ VoltAIRepair <span>Admin Panel</span></h1>
-    <div id="status" class="badge">Durum: <span>Demo veri</span></div>
-  </header>
-
-  <main>
-    <div class="grid">
-      <div class="card">
-        <h2>TOPLAM KAYIT</h2>
-        <p id="total">–</p>
+  <div class="wrap">
+    <!-- ÜST -->
+    <div class="topbar">
+      <div class="brand">
+        <span>⚙️</span><span>VoltAIRepair • <b>Admin Panel</b></span>
+        <span class="badge" id="demoFlag">Demo veri</span>
       </div>
-      <div class="card">
-        <h2>SON 24 SAAT</h2>
-        <p id="new24">–</p>
-      </div>
-      <div class="card">
-        <h2>TAMAMLAMA</h2>
-        <p id="completion">–</p>
+      <div class="menu">
+        <a class="btn brand" href="../index.html">🏠 Ana Sayfa</a>
+        <a class="btn" href="../ai-technician.html">🧠 AI Technician</a>
+        <a class="btn" href="../repair-cloud.html">☁️ Repair Cloud</a>
+        <a class="btn" href="../learning-hub.html">📚 Learning Hub</a>
       </div>
     </div>
 
-    <section class="codes">
-      <h3>📊 En Çok Görülen Panic Kodları</h3>
-      <ul id="topCodes">
-        <li><em>Veriler yükleniyor...</em></li>
-      </ul>
+    <!-- KARTLAR -->
+    <section class="grid" aria-label="istatistik">
+      <div class="card"><h3>TOPLAM KAYIT</h3><div class="val" id="total">—</div></div>
+      <div class="card"><h3>SON 24 SAAT</h3><div class="val" id="new24">—</div></div>
+      <div class="card"><h3>TAMAMLAMA</h3><div class="val" id="completion">—</div></div>
     </section>
-  </main>
 
-  <footer>
-    VoltAIRepair © 2025 — Admin Panel v1.0
-  </footer>
+    <!-- TABLOLAR -->
+    <section class="rows">
+      <div>
+        <table aria-label="son 24 saat en çok kodlar">
+          <thead><tr><th>Panik Kodu</th><th>Adet</th><th class="muted">Model / iOS</th></tr></thead>
+          <tbody id="top-codes"><tr><td colspan="3" class="muted">Yükleniyor…</td></tr></tbody>
+        </table>
+        <div class="hint">İlk 24 saatlik periyotta en çok görülen 3 kod.</div>
+      </div>
+      <div>
+        <table aria-label="log">
+          <thead><tr><th>Günlük</th></tr></thead>
+          <tbody id="log"><tr><td class="muted">Başlatılıyor…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
 
-  <!-- Scriptler -->
-  <script src="auth.js?v=1"></script>
-  <script src="dashboard.js?v=1"></script>
+    <footer>© VoltAIRepair • panel v1 • <span class="muted">yerel demo</span></footer>
+  </div>
+
+  <!-- GÖMÜLÜ İŞLEYİCİ -->
+  <script>
+    // === 0) Basit ayar ===
+    const DEMO = true;             // ileri’de bulut veri bağlayınca false yapılır
+    const DEMO_PASSWORD = "voltai"; // geçici login parolası (giriş formu eklediğinde kullan)
+
+    // === 1) Demo veri ===
+    const data = {
+      total: 1284,
+      new24: 36,
+      completion: 36,
+      topCodes: [
+        { code: "0x8000_002", count: 15, models: ["iPhone 11","iPhone XR"], ios: ["17.6","17.6.1"] },
+        { code: "0x6000_133", count: 9,  models: ["iPhone 12"],          ios: ["17.5.1"] },
+        { code: "0x5000_0A4", count: 7,  models: ["iPhone 11 Pro"],      ios: ["16.7.7"] }
+      ],
+      logs: [
+        "Panel yüklendi • demo verileri aktarıldı",
+        "UI yenilendi • ilk render tamam",
+        "Hazır • buluta bağlandığında otomatik geçiş"
+      ]
+    };
+
+    // === 2) UI bağlama ===
+    const ui = {
+      total: document.getElementById("total"),
+      new24: document.getElementById("new24"),
+      completion: document.getElementById("completion"),
+      top: document.getElementById("top-codes"),
+      log: document.getElementById("log"),
+      demoFlag: document.getElementById("demoFlag"),
+    };
+
+    // === 3) Yardımcılar ===
+    const pct = n => `${n}%`;
+    function log(line){ 
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td class="muted">${new Date().toLocaleTimeString()} • ${line}</td>`;
+      if(ui.log.firstElementChild?.firstElementChild?.classList.contains("muted")) ui.log.innerHTML="";
+      ui.log.prepend(tr);
+    }
+
+    // === 4) Render ===
+    function render(d){
+      ui.total.textContent = d.total.toLocaleString("tr-TR");
+      ui.new24.textContent = "+"+d.new24.toLocaleString("tr-TR");
+      ui.completion.textContent = pct(d.completion);
+
+      ui.top.innerHTML = d.topCodes.map(row => `
+        <tr>
+          <td><b>${row.code}</b></td>
+          <td>${row.count}</td>
+          <td class="muted">
+            <span class="pill">${row.models.join(" • ")}</span>
+            <span class="pill" style="margin-left:6px">${row.ios.join(" • ")}</span>
+          </td>
+        </tr>
+      `).join("");
+
+      (DEMO ? ui.demoFlag.style.display="inline-block" : ui.demoFlag.remove());
+      d.logs.forEach(log);
+    }
+
+    // === 5) Başlat ===
+    document.addEventListener("DOMContentLoaded", ()=>{ render(data); });
+  </script>
 </body>
 </html>
