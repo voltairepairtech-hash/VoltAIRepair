@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>VoltAIRepair • Yönetim Paneli</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>⚙️ VoltAIRepair — Yönetim Paneli</h1>
+    <div id="status" class="badge">Durum: <span>Bağlantı yok</span></div>
+  </header>
+
+  <main class="wrap">
+    <section class="login" id="loginBox">
+      <h2>🔐 Yönetici Girişi</h2>
+      <form id="loginForm">
+        <label>E-posta</label>
+        <input type="email" id="email" placeholder="ornek@domain.com" required>
+        <label>Şifre</label>
+        <input type="password" id="password" placeholder="••••••••" required>
+        <button type="submit">Giriş yap</button>
+        <p class="hint">Demo parola varsayılan; <em>auth.js</em> içinde değiştir.</p>
+      </form>
+    </section>
+
+    <section class="grid" id="dash" hidden>
+      <a class="card" href="../ai-technician.html">
+        <h3>🧠 AI Technician</h3>
+        <p>Arıza akışı & teşhis sihirbazı</p>
+      </a>
+      <a class="card" href="../repair-cloud.html">
+        <h3>☁️ Repair Cloud</h3>
+        <p>Teknik kayıt / parça uyumluluk</p>
+      </a>
+      <a class="card" href="../learning-hub.html">
+        <h3>📚 Learning Hub</h3>
+        <p>Eğitim içerikleri ve rehberler</p>
+      </a>
+      <a class="card" href="../index.html">
+        <h3>🏠 Ana Sayfa</h3>
+        <p>Siteye dön</p>
+      </a>
+
+      <div class="card wide">
+        <h3>📊 Günlük Atlas Özeti</h3>
+        <div id="dailyStats" class="stats">
+          <div><b>Kayıt (toplam)</b><span id="totalRecords">—</span></div>
+          <div><b>Yeni (24s)</b><span id="new24h">—</span></div>
+          <div><b>Tamamlanma</b><span id="completion">—</span></div>
+        </div>
+        <div id="topCodes" class="list"></div>
+      </div>
+
+      <div class="card">
+        <h3>🧾 Log</h3>
+        <pre id="logBox" class="log"></pre>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">© VoltAIRepair — “Teknoloji doğru kullanıldığında iyilik büyür.”</footer>
+
+  <script src="auth.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>
