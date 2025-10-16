@@ -1,12 +1,79 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="utf-8">
-  <title>VoltAIRepair — Test Panel</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>VoltAIRepair — Yönetim Paneli (Demo)</title>
+  <link rel="stylesheet" href="../assets/style.css" />
+  <meta name="description" content="VoltAIRepair yönetim paneli — iPhone Panic Atlas, ölçüm teknikleri, kaynaklar." />
 </head>
 <body>
-  <h1>VoltAIRepair Test Panel</h1>
-  <p>AI destekli tamir ve eğitim platformu başlatıldı ✅</p>
-  <p>Fikir Babası: <strong>Hakan Güner</strong></p>
+  <div class="container">
+    <nav>
+      <strong class="brand">⚡ VoltAIRepair — Panel</strong>
+      <a href="../index.html">← Ana Sayfa</a>
+      <a href="#istatistik">İstatistik</a>
+      <a href="#guncel">Güncel Kayıtlar</a>
+      <a href="https://github.com/voltairepairtech-hash/VoltAIRepair/issues" target="_blank" rel="noopener">Geri Bildirim</a>
+    </nav>
+
+    <header>
+      <h1>Yönetim Paneli (Demo)</h1>
+      <p class="lead">iPhone Panic Atlas ve onarım ekosistemi için kontrol alanı.</p>
+      <span class="badge">Erken önizleme</span>
+    </header>
+
+    <section id="istatistik">
+      <h2>Hızlı İstatistik</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>📚 Teknik Kayıt</h3>
+          <p><strong id="rec-count">1,284</strong> kayıt</p>
+          <p class="small">Tamamlanma: <strong id="progress">36%</strong></p>
+        </div>
+        <div class="card">
+          <h3>⚠️ Panic Kodları (Top 3)</h3>
+          <p><strong>AOP</strong>, <strong>SEP</strong>, <strong>NAND</strong></p>
+          <p class="small">iOS 16–18 arası konsolide.</p>
+        </div>
+        <div class="card">
+          <h3>🔗 Yeni Kaynaklar</h3>
+          <p><strong>+12</strong> açık kaynak</p>
+          <p class="small">REWA, Yaxin, iCorrect, GSMHosting…</p>
+        </div>
+        <div class="card">
+          <h3>👥 Topluluk</h3>
+          <p><strong>47</strong> test kullanıcısı</p>
+          <p class="small">Erken erişim.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="guncel" style="margin-top:18px">
+      <h2>Güncel Kayıtlar</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>iPhone 11 — Şarj Yok</h3>
+          <p>Tristar/Tigris hattı, PP_BATT_VCC ölçümleri, PMU koruma.</p>
+          <span class="badge">Doğrulandı</span>
+        </div>
+        <div class="card">
+          <h3>iPhone 12 — AOP Panic</h3>
+          <p>Audio codec besleme, I2S/CLK hatları, AOP rail analizi.</p>
+          <span class="badge">Doğrulandı</span>
+        </div>
+        <div class="card">
+          <h3>iPhone 13 — Baseband Reset</h3>
+          <p>RFFE hatları, RF_PA beslemesi, PMU bölümü.</p>
+          <span class="badge">İnceleme</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="footer">
+      <p>© VoltAIRepair — Fikir Babası: <strong>Hakan Güner</strong></p>
+      <p class="small">Bu bir demo görünümdür; canlı veri bağlantısı bir sonraki adımda eklenecek.</p>
+    </section>
+  </div>
 </body>
 </html>
