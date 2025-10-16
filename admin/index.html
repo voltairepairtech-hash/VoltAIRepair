@@ -1,66 +1,145 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>VoltAIRepair — Yönetim Paneli</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VoltAIRepair Admin Panel</title>
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* Dahili küçük dark tema stil desteği */
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0f0f10;
+      color: #f2f2f2;
+      margin: 0;
+      padding: 0;
+      line-height: 1.5;
+    }
+
+    header {
+      background: #1a1a1a;
+      padding: 16px 20px;
+      border-bottom: 1px solid #222;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    header h1 {
+      font-size: 1.2rem;
+      margin: 0;
+      color: #00c6ff;
+    }
+
+    #status {
+      background: #222;
+      padding: 5px 10px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      color: #9ca3af;
+    }
+
+    main {
+      padding: 20px;
+    }
+
+    .stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #222;
+      border-radius: 10px;
+      padding: 14px 18px;
+      flex: 1 1 180px;
+      min-width: 150px;
+    }
+
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 0.9rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .card p {
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    section h3 {
+      margin-top: 24px;
+      font-size: 1rem;
+      color: #a3b3c3;
+    }
+
+    ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    ul li {
+      padding: 4px 0;
+      border-bottom: 1px solid #222;
+      font-size: 0.9rem;
+    }
+
+    footer {
+      text-align: center;
+      font-size: 0.8rem;
+      opacity: 0.5;
+      padding: 20px;
+      border-top: 1px solid #222;
+      margin-top: 40px;
+    }
+
+    @media (max-width: 600px) {
+      .stats {
+        flex-direction: column;
+      }
+    }
+  </style>
 </head>
+
 <body>
-  <header class="topbar">
-    <h1>⚙️ VoltAIRepair — Yönetim Paneli</h1>
-    <div class="badge" id="conn-status">Durum: Bağlantı yok</div>
+  <header>
+    <h1>VoltAIRepair • Admin Panel</h1>
+    <span id="status">Bağlantı yok</span>
   </header>
 
-  <main class="wrap">
-    <!-- GİRİŞ FORMU -->
-    <section class="login" id="login">
-      <h2>🔐 Yönetici Girişi</h2>
-
-      <form id="login-form" autocomplete="off">
-        <label for="admin-email">E-posta</label>
-        <input id="admin-email" type="email" placeholder="ornek@domain.com" required>
-
-        <label for="admin-pass">Şifre</label>
-        <input id="admin-pass" type="password" placeholder="••••••••" required>
-
-        <button type="submit" id="login-btn">Giriş yap</button>
-        <p class="hint">Demo bilgiler: <b>hknngnr36@gmail.com</b> / <b>voltai</b> — (auth.js içinde değiştirilebilir)</p>
-      </form>
-    </section>
-
-    <!-- PANEL / MODÜLLER -->
-    <section class="grid" id="dashboard" hidden>
-      <div class="rowtitle">
-        <h2>🧭 Modüller</h2>
-        <button id="logout-btn" class="ghost">Çıkış</button>
+  <main>
+    <div class="stats">
+      <div class="card">
+        <h2>Toplam Kayıt</h2>
+        <p id="total">–</p>
       </div>
+      <div class="card">
+        <h2>Son 24 Saat</h2>
+        <p id="new24">–</p>
+      </div>
+      <div class="card">
+        <h2>Tamamlama</h2>
+        <p id="completion">–</p>
+      </div>
+    </div>
 
-      <a class="card" href="../ai-technician.html">
-        <h3>🧠 AI Technician</h3>
-        <p>Arıza akışı & teşhis sihirbazı (erken prototip)</p>
-      </a>
-
-      <a class="card" href="../repair-cloud.html">
-        <h3>☁️ Repair Cloud</h3>
-        <p>Teknik kayıt / parça yükleme alanı</p>
-      </a>
-
-      <a class="card" href="../learning-hub.html">
-        <h3>📚 Learning Hub</h3>
-        <p>Eğitim içerikleri & not merkezi</p>
-      </a>
-
-      <a class="card" href="../index.html">
-        <h3>🏠 Ana Sayfa</h3>
-        <p>VoltAIRepair ana sayfasına dön</p>
-      </a>
+    <section>
+      <h3>En Çok Görülen Panic Kodları</h3>
+      <div id="topCodes"><em>Veri yükleniyor...</em></div>
     </section>
   </main>
 
-  <!-- küçük toast bildirimi -->
-  <div id="toast" class="toast" hidden></div>
+  <footer>
+    VoltAIRepair Admin Panel • v1.0 — © 2025
+  </footer>
 
-  <script src="auth.js"></script>
+  <!-- Scriptler -->
+  <script src="auth.js?v=1"></script>
+  <script src="dashboard.js?v=1"></script>
 </body>
 </html>
