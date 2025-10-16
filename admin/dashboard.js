@@ -1,63 +1,54 @@
-// admin/admin/dashboard.js
-// Panel metriklerini /data/panel.json'dan çeker.
-// Bağlantı hatası olursa demo veriye düşer ve rozet "Demo veri" kalır.
+// admin/dashboard.js  — VoltAIRepair Admin Panel (live JSON + graceful fallback)
 
+// UI refs
 const ui = {
-  mode: document.getElementById('modeBadge'),
   total: document.getElementById('totalCount'),
   new24: document.getElementById('new24'),
-  comp: document.getElementById('completion'),
-  top: document.getElementById('topCodes') // <ul> veya <div>
+  comp:  document.getElementById('completePct'),
+  top:   document.getElementById('topCodes'),
+  badge: document.getElementById('badgeMode'), // "Demo veri" rozeti
 };
 
-// Demo fallback (fetch başarısızsa)
+// Mutlak URL (Pages yol hatasını bitirir)
+const LIVE_JSON = "https://voltairepairtech-hash.github.io/VoltAIRepair/data/panel.json?bust=" + Date.now();
+
+// Demo yedek veri (fetch başarısızsa)
 const demoStats = {
-  totals: { technical_records: 1284, new_last_24h: 36, completion_percent: 36 },
-  top_panic_codes_24h: [
-    { code: "0x8000_002", count: 5, ios: "17.5", models: ["iPhone 11", "iPhone 12"] },
-    { code: "0x6000_133", count: 4, ios: "16.7", models: ["iPhone Xr"] },
-    { code: "0x5000_0A4", count: 3, ios: "17.2", models: ["iPhone 11 Pro"] }
+  updated_at: new Date().toISOString(),
+  total: 1284,
+  new24: 36,
+  complete_pct: 36,
+  topCodes: [
+    { code: "0x8000_002", count: 5, models: ["iPhone 11","11 Pro"] },
+    { code: "0x6000_133", count: 4, models: ["iPhone 12","12 mini"] },
+    { code: "0x5000_0A4", count: 3, models: ["iPhone XR"] }
   ]
 };
 
-function applyStats(data, isLive) {
+function render(stats, mode) {
+  ui.total.textContent = (stats.total ?? 0).toLocaleString('tr-TR');
+  ui.new24.textContent = "+" + (stats.new24 ?? 0);
+  ui.comp.textContent  = (stats.complete_pct ?? 0) + "%";
+  ui.top.innerHTML = (stats.topCodes ?? [])
+    .map(t => `<li><code>${t.code}</code> — <strong>${t.count}</strong> <span style="color:#94a3b8">(${(t.models||[]).join(", ")})</span></li>`)
+    .join("") || "<li>Kayıt yok</li>";
+
+  if (ui.badge) {
+    ui.badge.textContent = (mode === "live") ? "Canlı veri" : "Demo veri";
+    ui.badge.className   = (mode === "live") ? "badge live" : "badge demo";
+  }
+}
+
+async function load() {
   try {
-    ui.total.textContent = (data.totals.technical_records ?? 0).toLocaleString('tr-TR');
-    ui.new24.textContent = `+${data.totals.new_last_24h ?? 0}`;
-    ui.comp.textContent = `${data.totals.completion_percent ?? 0}%`;
-
-    // Top panic listesi
-    if (ui.top) {
-      const list = (data.top_panic_codes_24h || []).map(
-        r => `<li><strong>${r.code}</strong> • ${r.count} adet` +
-             `${r.ios ? ` • iOS ${r.ios}` : ""}` +
-             `${r.models ? ` • ${r.models.join(", ")}` : ""}</li>`
-      ).join("");
-      ui.top.innerHTML = list || "<li>Son 24 saatte kayıt yok.</li>";
-    }
-
-    // Rozet
-    if (ui.mode) {
-      ui.mode.textContent = isLive ? "Canlı veri" : "Demo veri";
-      ui.mode.classList.toggle('online', isLive);
-    }
+    const res = await fetch(LIVE_JSON, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    render(data, "live");
   } catch (e) {
-    console.error("Render error:", e);
+    console.warn("Live JSON okunamadı, demo'ya düşüldü:", e);
+    render(demoStats, "demo");
   }
 }
 
-async function loadStats() {
-  const url = `/VoltAIRepair/data/panel.json?bust=${Date.now()}`;
-  try {
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    applyStats(json, true);            // canlı veri
-    console.log("Panel canlı veriyi yükledi.");
-  } catch (err) {
-    console.warn("Canlı veri alınamadı, demo veriye düşüldü:", err);
-    applyStats(demoStats, false);      // demo veriye fallback
-  }
-}
-
-document.addEventListener("DOMContentLoaded", loadStats);
+document.addEventListener("DOMContentLoaded", load);
