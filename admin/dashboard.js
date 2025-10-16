@@ -1,58 +1,63 @@
+// admin/admin/dashboard.js
+// Panel metriklerini /data/panel.json'dan çeker.
+// Bağlantı hatası olursa demo veriye düşer ve rozet "Demo veri" kalır.
+
 const ui = {
-  total: document.getElementById("total"),
-  new24: document.getElementById("new24"),
-  completion: document.getElementById("completion"),
-  top: document.getElementById("topCodes"),
-  status: document.getElementById("status").querySelector("span")
+  mode: document.getElementById('modeBadge'),
+  total: document.getElementById('totalCount'),
+  new24: document.getElementById('new24'),
+  comp: document.getElementById('completion'),
+  top: document.getElementById('topCodes') // <ul> veya <div>
 };
 
+// Demo fallback (fetch başarısızsa)
 const demoStats = {
-  total: 1284,
-  new24: 36,
-  completion: 36,
-  topCodes: [
-    { code: "0x8000_002", count: 5, models: ["iPhone 11", "12 Pro"], ios: "17.5.1" },
-    { code: "0x6000_133", count: 4, models: ["iPhone XR"], ios: "16.7.8" },
-    { code: "0x5900_0A4", count: 3, models: ["SE 2", "8 Plus"], ios: "17.4" }
+  totals: { technical_records: 1284, new_last_24h: 36, completion_percent: 36 },
+  top_panic_codes_24h: [
+    { code: "0x8000_002", count: 5, ios: "17.5", models: ["iPhone 11", "iPhone 12"] },
+    { code: "0x6000_133", count: 4, ios: "16.7", models: ["iPhone Xr"] },
+    { code: "0x5000_0A4", count: 3, ios: "17.2", models: ["iPhone 11 Pro"] }
   ]
 };
 
-async function loadData() {
+function applyStats(data, isLive) {
   try {
-    const [statsRes, codesRes] = await Promise.all([
-      fetch("./data/stats.json"),
-      fetch("./data/top-codes.json")
-    ]);
+    ui.total.textContent = (data.totals.technical_records ?? 0).toLocaleString('tr-TR');
+    ui.new24.textContent = `+${data.totals.new_last_24h ?? 0}`;
+    ui.comp.textContent = `${data.totals.completion_percent ?? 0}%`;
 
-    if (!statsRes.ok || !codesRes.ok) throw new Error("Demo mod");
+    // Top panic listesi
+    if (ui.top) {
+      const list = (data.top_panic_codes_24h || []).map(
+        r => `<li><strong>${r.code}</strong> • ${r.count} adet` +
+             `${r.ios ? ` • iOS ${r.ios}` : ""}` +
+             `${r.models ? ` • ${r.models.join(", ")}` : ""}</li>`
+      ).join("");
+      ui.top.innerHTML = list || "<li>Son 24 saatte kayıt yok.</li>";
+    }
 
-    const stats = await statsRes.json();
-    const codes = await codesRes.json();
-
-    render(stats.total, stats.new24, stats.completion, codes, "Bağlı");
+    // Rozet
+    if (ui.mode) {
+      ui.mode.textContent = isLive ? "Canlı veri" : "Demo veri";
+      ui.mode.classList.toggle('online', isLive);
+    }
   } catch (e) {
-    render(
-      demoStats.total,
-      demoStats.new24,
-      demoStats.completion,
-      demoStats.topCodes,
-      "Demo veri"
-    );
+    console.error("Render error:", e);
   }
 }
 
-function render(total, new24, completion, codes, mode) {
-  ui.total.textContent = total.toLocaleString("tr-TR");
-  ui.new24.textContent = `+${new24}`;
-  ui.completion.textContent = `${completion}%`;
-  ui.status.textContent = mode;
-
-  ui.top.innerHTML = codes
-    .map(
-      (c) =>
-        `<li><strong>${c.code}</strong> — ${c.count} kez <span style="color:#94a3b8">(${c.ios}, ${c.models.join(", ")})</span></li>`
-    )
-    .join("");
+async function loadStats() {
+  const url = `/VoltAIRepair/data/panel.json?bust=${Date.now()}`;
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    applyStats(json, true);            // canlı veri
+    console.log("Panel canlı veriyi yükledi.");
+  } catch (err) {
+    console.warn("Canlı veri alınamadı, demo veriye düşüldü:", err);
+    applyStats(demoStats, false);      // demo veriye fallback
+  }
 }
 
-loadData();
+document.addEventListener("DOMContentLoaded", loadStats);
