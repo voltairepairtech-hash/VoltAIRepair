@@ -1,34 +1,92 @@
-// admin/auth.js  — DEMO oturum (e-posta: hknngnr36@gmail.com, şifre: voltai)
-(() => {
-  const ADMIN_EMAIL = "hknngnr36@gmail.com";
-  const ADMIN_PASS  = "voltai"; // DEMO - sonra değiştir
+// ========== Basit yerel kimlik doğrulama ==========
+// NOT: Üretimde gerçek bir backend gerekir. Bu demo sadece localStorage ile çalışır.
 
-  const $ = (s) => document.querySelector(s);
+const DEMO_EMAIL = "hknngnr36@gmail.com";
+const DEMO_PASS  = "voltai";
 
-  const form   = $('#login-form') || $('form');
-  const email  = $('#admin-email') || $('input[type="email"]');
-  const pass   = $('#admin-pass')  || $('input[type="password"]');
-  const status = $('#conn-status'); // varsa "Durum" yazısını günceller
+const sel = (q) => document.querySelector(q);
+const $status = sel("#conn-status");
+const $login  = sel("#login");
+const $dash   = sel("#dashboard");
+const $form   = sel("#login-form");
+const $email  = sel("#admin-email");
+const $pass   = sel("#admin-pass");
+const $btn    = sel("#login-btn");
+const $logout = sel("#logout-btn");
+const $toast  = sel("#toast");
 
-  function unlockUI() {
-    document.querySelectorAll('[data-requires-auth]').forEach(el => el.removeAttribute('hidden'));
-    if (status) { status.textContent = 'Bağlandı'; status.style.color = '#3fb950'; }
+function setStatus(connected) {
+  if (connected) {
+    $status.textContent = "Durum: Bağlandı";
+    $status.classList.add("ok");
+  } else {
+    $status.textContent = "Durum: Bağlantı yok";
+    $status.classList.remove("ok");
   }
+}
 
-  // Girişten sonra açık kalsın
-  if (localStorage.getItem('var_admin') === '1') unlockUI();
+function showToast(msg, type = "info") {
+  $toast.textContent = msg;
+  $toast.className = `toast ${type}`;
+  $toast.hidden = false;
+  setTimeout(() => ($toast.hidden = true), 2200);
+}
 
-  if (form) {
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const ok = email?.value.trim().toLowerCase() === ADMIN_EMAIL && pass?.value === ADMIN_PASS;
-      if (ok) {
-        localStorage.setItem('var_admin', '1');
-        unlockUI();
-        alert('Giriş başarılı ✅');
-      } else {
-        alert('E-posta veya şifre hatalı');
-      }
-    });
+function showDashboard() {
+  $login.hidden = true;
+  $dash.hidden  = false;
+  setStatus(true);
+}
+
+function showLogin() {
+  $dash.hidden  = true;
+  $login.hidden = false;
+  setStatus(false);
+}
+
+function disableForm(disabled) {
+  [$email, $pass, $btn].forEach(el => (el.disabled = disabled));
+}
+
+// İlk yüklemede oturum var mı?
+document.addEventListener("DOMContentLoaded", () => {
+  const token = localStorage.getItem("va_logged_in");
+  if (token === "true") {
+    showDashboard();
+  } else {
+    showLogin();
   }
-})();
+});
+
+// Giriş
+$form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  disableForm(true);
+
+  const mail = ($email.value || "").trim().toLowerCase();
+  const pwd  = $pass.value || "";
+
+  // küçük gecikme → “işleniyor” hissi
+  setTimeout(() => {
+    if (mail === DEMO_EMAIL && pwd === DEMO_PASS) {
+      localStorage.setItem("va_logged_in", "true");
+      showDashboard();
+      showToast("Giriş başarılı", "ok");
+      $pass.value = "";
+    } else {
+      showToast("E-posta veya şifre hatalı", "err");
+      // ufak bir sallama efekti
+      $form.classList.remove("shake");
+      void $form.offsetWidth;
+      $form.classList.add("shake");
+    }
+    disableForm(false);
+  }, 450);
+});
+
+// Çıkış
+$logout.addEventListener("click", () => {
+  localStorage.removeItem("va_logged_in");
+  showLogin();
+  showToast("Oturum kapatıldı", "info");
+});
