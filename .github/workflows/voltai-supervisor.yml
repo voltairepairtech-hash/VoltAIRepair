@@ -1,64 +1,22 @@
 name: VoltAI Supervisor
-
 on:
-  workflow_dispatch:
-    inputs:
-      talimat:
-        description: "Ne yapılsın? (ör: günlük rapor oluştur, kaynak ekle: ...)"
-        required: true
-        type: string
-
-permissions:
-  contents: write
-
+  workflow_dispatch: {}     # Elle çalıştır
+  schedule:
+    - cron: "0 3 * * 1"     # Pazartesi 06:00 (TR) civarı haftalık tetik
 jobs:
-  apply:
+  keep-alive:
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Talimatı oku
-        id: read
+      - uses: actions/checkout@v4
+      - name: Touch timestamp to trigger Pages
         run: |
-          echo "TALIMAT=${{ github.event.inputs.talimat }}" >> $GITHUB_ENV
-          echo "📥 Kullanıcı talimatı: ${{ github.event.inputs.talimat }}"
-
-      - name: Ortamı hazırla
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > .pages-timestamp
+      - name: Commit
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y jq
-          mkdir -p data
-          touch data/panel.json
-
-      - name: panel.json oluştur (yoksa)
-        run: |
-          if [ ! -f data/panel.json ]; then
-            echo '{"totals":{"records":0,"new24h":0,"completionPct":0},"updatedAt":"1970-01-01T00:00:00Z"}' > data/panel.json
-          fi
-
-      - name: Günlük rapor oluştur
-        if: contains(env.TALIMAT, 'günlük rapor')
-        run: |
-          DATE=$(date -u +"%Y-%m-%d")
-          jq --arg d "$DATE" '.dailyReport.date=$d | .updatedAt=$d' data/panel.json > data/tmp.json
-          mv data/tmp.json data/panel.json
-          echo "✅ Günlük rapor oluşturuldu ($DATE)."
-
-      - name: Kaynak ekle
-        if: contains(env.TALIMAT, 'kaynak ekle')
-        run: |
-          LIST=$(echo "${{ github.event.inputs.talimat }}" | sed 's/.*kaynak ekle://i' | tr ',' '\n' | sed 's/^ *//;s/ *$//' | jq -R . | jq -s .)
-          jq --argjson arr "$LIST" '.dailyReport.newSourcesTop10 += $arr' data/panel.json > data/tmp.json
-          mv data/tmp.json data/panel.json
-          echo "✅ Kaynaklar eklendi: $LIST"
-
-      - name: Commit & Push
-        run: |
-          git config user.name "VoltAI Supervisor"
-          git config user.email "operator@users.noreply.github.com"
-          git add -A
-          git diff --cached --quiet || git commit -m "auto: VoltAI Supervisor güncelleme"
+          git config user.name "voltai-supervisor"
+          git config user.email "actions@github.com"
+          git add .pages-timestamp
+          git commit -m "chore: trigger pages redeploy"
           git push
-          echo "🚀 Güncelleme gönderildi."
