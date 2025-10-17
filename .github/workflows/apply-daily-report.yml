@@ -1,61 +1,50 @@
-name: AI Auto Apply
+name: Apply Daily Report
 
 on:
-  issue_comment:
-    types: [created]
-  issues:
-    types: [opened, edited, labeled]
+  # Elle çalıştırma (Run workflow)
   workflow_dispatch:
+  # İstersen otomatik de tetiklensin (günlük 08:00 UTC) — isterse kaldırabilirsin
+  schedule:
+    - cron: "0 8 * * *"
+  # Repo’ya push/PR olunca da çalışsın (istersen kaldır)
+  push:
+    branches: [ main ]
+  pull_request:
 
 permissions:
   contents: write
-  issues: read
-  pull-requests: read
+
+concurrency:
+  group: apply-daily-report
+  cancel-in-progress: false
 
 jobs:
   apply:
-    if: >
-      (github.event_name == 'issue_comment' && 
-       github.event.issue.state == 'open' &&
-       contains(github.event.issue.labels.*.name, 'voltai-operator'))
-      || 
-      (github.event_name == 'issues' &&
-       github.event.action != 'closed' &&
-       contains(github.event.issue.labels.*.name, 'voltai-operator'))
-      ||
-      (github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
     steps:
-      - name: Checkout
+      - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
 
-      - name: Extract free-text instruction
-        id: text
+      - name: Ensure folders exist
         run: |
-          mkdir -p .voltai
-          if [ "${{ github.event_name }}" = "issue_comment" ]; then
-            echo "${{ github.event.comment.body }}" > .voltai/instruction.txt
-          elif [ "${{ github.event_name }}" = "issues" ]; then
-            echo "${{ github.event.issue.body }}" > .voltai/instruction.txt
-          else
-            echo "Manual dispatch - edit .voltai/instruction.txt if needed" > .voltai/instruction.txt
-          fi
-          echo "----- INSTRUCTION -----"
-          cat .voltai/instruction.txt
-          echo "-----------------------"
+          mkdir -p admin/admin data
 
-      - name: Ensure folders
-        run: |
-          mkdir -p admin admin/admin data
-
-      - name: Patch admin/index.html (ensure dailyReport + script)
+      - name: Create/patch admin/index.html (report container + script)
         run: |
           if [ -f admin/index.html ]; then
+            # Günlük rapor bölümü yoksa </body> öncesine ekle
             if ! grep -q 'id="dailyReport"' admin/index.html; then
-              sed -i 's#</body>#  <section id="dailyReport" class="card" style="margin-top:16px;"></section>\n</body>#' admin/index.html || true
+              sed -i 's#</body>#  <section id="dailyReport" class="card" style="margin-top:16px;"></section>\n</body>#' admin/index.html
             fi
+            # dashboard.js include yoksa ekle
             if ! grep -q 'admin/admin/dashboard.js' admin/index.html; then
-              sed -i 's#</body>#  <script src="./admin/admin/dashboard.js"></script>\n</body>#' admin/index.html || true
+              sed -i 's#</body>#  <script src="./admin/admin/dashboard.js"></script>\n</body>#' admin/index.html
             fi
           else
             cat > admin/index.html <<'HTML'
@@ -89,34 +78,47 @@ jobs:
 HTML
           fi
 
-      - name: Dashboard JS (live JSON + renderer)
+      - name: Write admin/admin/dashboard.js
         run: |
           cat > admin/admin/dashboard.js <<'JS'
+// admin/admin/dashboard.js — Canlı JSON + Günlük Rapor render
+
 const ui = {
   total: document.getElementById('totalCount'),
   new24: document.getElementById('new24'),
   comp:  document.getElementById('completePct'),
   badge: document.getElementById('badgeMode'),
 };
-const LIVE_JSON = location.origin + location.pathname.replace(/\/admin\/.*/,'') + '/data/panel.json?bust=' + Date.now();
-const demo = { totals:{records:1284,new24h:36,completionPct:36}, dailyReport:null };
+
+const LIVE_JSON = "https://voltairepairtech-hash.github.io/VoltAIRepair/data/panel.json?bust=" + Date.now();
+
+const demo = {
+  totals: { records: 1284, new24h: 36, completionPct: 36 },
+  dailyReport: null
+};
 
 function applyStats(data, isLive){
-  const t = data.totals || {};
-  if (ui.total) ui.total.textContent = (t.records ?? 0).toLocaleString('tr-TR');
-  if (ui.new24) ui.new24.textContent = "+" + (t.new24h ?? 0);
-  if (ui.comp)  ui.comp.textContent  = (t.completionPct ?? 0) + "%";
-  if (ui.badge){
-    ui.badge.textContent = isLive ? "Canlı veri" : "Demo veri";
-    ui.badge.className   = isLive ? "badge live" : "badge";
-  }
-  renderDailyReport(data);
+  try{
+    const t = data.totals || {};
+    if (ui.total) ui.total.textContent = (t.records ?? 0).toLocaleString('tr-TR');
+    if (ui.new24) ui.new24.textContent = "+" + (t.new24h ?? 0);
+    if (ui.comp)  ui.comp.textContent  = (t.completionPct ?? 0) + "%";
+    if (ui.badge){
+      ui.badge.textContent = isLive ? "Canlı veri" : "Demo veri";
+      ui.badge.className = isLive ? "badge live" : "badge";
+    }
+    renderDailyReport(data);
+  }catch(e){ console.warn(e); }
 }
+
 function renderDailyReport(data){
   const el = document.getElementById('dailyReport');
   if (!el) return;
   const r = data.dailyReport;
-  if (!r){ el.innerHTML = '<div class="muted">Günlük rapor henüz eklenmedi.</div>'; return; }
+  if (!r){
+    el.innerHTML = '<div class="muted">Günlük rapor henüz eklenmedi.</div>';
+    return;
+  }
   const li = a => (a||[]).map(x=>`<li>${x}</li>`).join("");
   el.innerHTML = `
     <h3>Günlük İlerleme (${r.date})</h3>
@@ -128,27 +130,29 @@ function renderDailyReport(data){
       <div class="card"><b>Acil Aksiyonlar</b><ul>${li(r.urgent)}</ul></div>
     </div>`;
 }
+
 async function load(){
   try{
-    const res = await fetch(LIVE_JSON,{cache:"no-store"});
-    if(!res.ok) throw 0;
+    const res = await fetch(LIVE_JSON, {cache:"no-store"});
+    if(!res.ok) throw new Error("HTTP "+res.status);
     const json = await res.json();
     if (!json.totals && json.total){
-      json.totals = {records:json.total,new24h:json.new24,completionPct:json.completion};
+      json.totals = { records: json.total, new24h: json.new24, completionPct: json.completion };
     }
-    applyStats(json,true);
-  }catch{
-    applyStats(demo,false);
+    applyStats(json, true);
+  }catch(e){
+    console.warn("Canlı veri okunamadı, demo:", e);
+    applyStats(demo, false);
   }
 }
 document.addEventListener("DOMContentLoaded", load);
 JS
 
-      - name: Build daily report JSON from natural text
+      - name: Seed/merge data/panel.json with Daily Report
         run: |
+          set -e
           NOW=$(date -u +"%Y-%m-%d")
           mkdir -p data
-          # Panel.json yoksa iskelet
           if [ ! -f data/panel.json ]; then
             cat > data/panel.json <<JSON
 {
@@ -158,50 +162,53 @@ JS
 JSON
           fi
 
-          # Talimat metnini basit sezgisel kuralla bloklara ayır
-          # - madde işaretleri veya satır başlarına göre ayrıştırıyoruz
-          awk 'NF{print "- "$0}' .voltai/instruction.txt > .voltai/bullets.txt
-
-          # En sık anahtar kelimelere göre dört gruba dağıt
-          python3 - <<'PY'
-import json,re,datetime,sys
-from pathlib import Path
-
-bullets=Path(".voltai/bullets.txt").read_text(encoding="utf-8").splitlines()
-groups={"newSourcesTop10":[],"sponsorsLeads":[],"affiliateBlocks":[],"urgent":[]}
-for line in bullets:
-    s=line[2:].strip()
-    low=s.lower()
-    if any(k in low for k in ["kaynak","source","link","wiki","ifixit","youtube","github","doc"]):
-        groups["newSourcesTop10"].append(s)
-    elif any(k in low for k in ["sponsor","lead","reklam","ilan","partner"]):
-        groups["sponsorsLeads"].append(s)
-    elif any(k in low for k in ["affiliate","blok","amazon","aliexpress","ref"]):
-        groups["affiliateBlocks"].append(s)
-    elif any(k in low for k in ["acil","urgent","kritik","fix","bug","todo"]):
-        groups["urgent"].append(s)
-    else:
-        # sınıflanamayanlar acil'e düşsün
-        groups["urgent"].append(s)
-
-p=json.load(open("data/panel.json","r",encoding="utf-8"))
-p["dailyReport"]={
-    "date": datetime.datetime.utcnow().strftime("%Y-%m-%d"),
-    **groups
+          cat > data/daily-report-tmp.json <<JSON
+{
+  "dailyReport": {
+    "date": "$NOW",
+    "newSourcesTop10": [
+      "ifixit/iphone-11-charging-guide",
+      "apple-discussions/panic-0x8000_002-thread",
+      "gsmhosting/iphone-11-tristar-qc",
+      "notion/atlas-build-notes-#23",
+      "youtube/board-repair-lab-tristar-measure",
+      "reddit/ios-panic-log-fixes",
+      "medium/dfu-diagnosis-ios17",
+      "apple-security/kernel-panic-doc",
+      "wikipedia/lightning-pinout",
+      "github/boardview-tools"
+    ],
+    "sponsorsLeads": ["JBC Tools (warm)", "QUCC Battery (cold)", "Kaisi (warm)"],
+    "affiliateBlocks": ["AtlasBookNet-Amazon-US", "AtlasBookNet-Aliexpress", "AtlasBookNet-Tooling-Bundle"],
+    "urgent": [
+      "Fix: Update-Panel workflow cron drift",
+      "Add: Panic code map for iOS 18.x",
+      "Docs: Measurement photos for iPhone 12 PM VBUS rail"
+    ]
+  }
 }
-json.dump(p,open("data/panel.json","w",encoding="utf-8"),ensure_ascii=False,indent=2)
-print("panel.json updated")
+JSON
+
+          python3 - <<'PY'
+import json, sys
+p='data/panel.json'; q='data/daily-report-tmp.json'
+with open(p, 'r', encoding='utf-8') as f: a=json.load(f)
+with open(q, 'r', encoding='utf-8') as f: b=json.load(f)
+a['dailyReport']=b['dailyReport']
+with open(p, 'w', encoding='utf-8') as f: json.dump(a, f, indent=2, ensure_ascii=False)
+print("Merged dailyReport into data/panel.json")
 PY
 
-      - name: Commit & Push
+          rm -f data/daily-report-tmp.json
+
+      - name: Commit & push changes
         run: |
           git config user.name  "voltai-operator"
           git config user.email "operator@users.noreply.github.com"
           git add -A
           if git diff --cached --quiet; then
-            echo "No changes."
+            echo "No changes to commit."
           else
-            MSG="ci(auto): apply command from issue #${{ github.event.issue.number || 'manual' }}"
-            git commit -m "$MSG"
-            git push
+            git commit -m "feat(panel): add/update Daily Report and UI"
+            git push origin HEAD:main
           fi
