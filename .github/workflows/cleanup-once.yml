@@ -1,0 +1,30 @@
+name: One-Time Cleanup (delete broken workflow)
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Silmek istediğin dosyaları buraya ekle
+      - name: Delete bad workflow(s)
+        run: |
+          git rm -f .github/workflows/apply-daily-report.yml || true
+          git rm -f .github/workflows/voltai-bootstrap.yml || true
+
+      - name: Commit & push
+        run: |
+          git config user.name  "voltai-operator"
+          git config user.email "operator@users.noreply.github.com"
+          if git diff --cached --quiet; then
+            echo "Nothing to delete."
+          else
+            git commit -m "chore: cleanup old workflows"
+            git push
+          fi
