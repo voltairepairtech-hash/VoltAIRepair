@@ -1,46 +1,43 @@
 name: Update Panel Data
 
 on:
-  # Elle çalıştırma (GitHub uygulamasından Run Workflow ile)
   workflow_dispatch:
-  # Otomatik çalışma (günde 4 kez)
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: "*/30 * * * *"  # 30 dakikada bir
 
 permissions:
   contents: write
 
-# Aynı anda birden fazla run çakışmasın
-concurrency:
-  group: panel-update
-  cancel-in-progress: false
-
 jobs:
-  panel:
+  update:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Ensure folders
-        run: |
-          mkdir -p admin admin/admin data
-
-      - name: Patch admin/index.html (create if missing)
         shell: bash
         run: |
+          set -e
+          mkdir -p admin/admin data
+
+      - name: Patch admin/index.html (create or update)
+        shell: bash
+        run: |
+          set -e
           if [ -f admin/index.html ]; then
             # Günlük rapor alanı yoksa ekle
             if ! grep -q 'id="dailyReport"' admin/index.html; then
-              sed -i 's#</body>#  <section id="dailyReport" class="card" style="margin-top:16px;"></section>\n</body>#' admin/index.html || true
+              sed -i 's#</body>#  <section id="dailyReport" class="card" style="margin-top:16px;"></section>\n</body>#' admin/index.html
             fi
-            # dashboard.js tag'i yoksa ekle
-            if ! grep -q 'admin/admin/dashboard.js' admin/index.html; then
-              sed -i 's#</body>#  <script src="./admin/admin/dashboard.js"></script>\n</body>#' admin/index.html || true
+            # dashboard.js yoksa ekle
+            if ! grep -q './admin/admin/dashboard.js' admin/index.html; then
+              sed -i 's#</body>#  <script src="./admin/admin/dashboard.js"></script>\n</body>#' admin/index.html
             fi
           else
-            cat > admin/index.html <<'HTML'
+            cat <<'HTML' > admin/index.html
 <!doctype html>
 <html lang="tr">
 <head>
@@ -71,25 +68,24 @@ jobs:
 HTML
           fi
 
-      - name: Ensure admin/admin/dashboard.js (render & live JSON)
+      - name: Write admin/admin/dashboard.js
+        shell: bash
         run: |
-          cat > admin/admin/dashboard.js <<'JS'
+          set -e
+          mkdir -p admin/admin
+          cat <<'JS' > admin/admin/dashboard.js
 // admin/admin/dashboard.js — Canlı JSON + Günlük Rapor render
-
 const ui = {
   total: document.getElementById('totalCount'),
   new24: document.getElementById('new24'),
   comp:  document.getElementById('completePct'),
   badge: document.getElementById('badgeMode'),
 };
-
-const LIVE_JSON = location.origin + location.pathname.replace(/\/admin\/?.*$/,'') + "/data/panel.json?bust=" + Date.now();
-
+const LIVE_JSON = "https://voltairepairtech-hash.github.io/VoltAIRepair/data/panel.json?bust=" + Date.now();
 const demo = {
   totals: { records: 1284, new24h: 36, completionPct: 36 },
   dailyReport: null
 };
-
 function applyStats(data, isLive){
   try{
     const t = data.totals || {};
@@ -103,7 +99,6 @@ function applyStats(data, isLive){
     renderDailyReport(data);
   }catch(e){ console.warn(e); }
 }
-
 function renderDailyReport(data){
   const el = document.getElementById('dailyReport');
   if (!el) return;
@@ -123,7 +118,6 @@ function renderDailyReport(data){
       <div class="card"><b>Acil Aksiyonlar</b><ul>${li(r.urgent)}</ul></div>
     </div>`;
 }
-
 async function load(){
   try{
     const res = await fetch(LIVE_JSON, {cache:"no-store"});
@@ -141,22 +135,21 @@ async function load(){
 document.addEventListener("DOMContentLoaded", load);
 JS
 
-      - name: Seed data/panel.json if missing + merge daily report
+      - name: Merge/seed data/panel.json with Daily Report
         shell: bash
         run: |
+          set -e
           NOW=$(date -u +"%Y-%m-%d")
           mkdir -p data
           if [ ! -f data/panel.json ]; then
-            cat > data/panel.json <<JSON
+            cat <<'JSON' > data/panel.json
 {
   "totals": { "records": 1284, "new24h": 36, "completionPct": 36 },
   "updatedAt": "1970-01-01T00:00:00Z"
 }
 JSON
           fi
-
-          # Örnek günlük rapor (sonra kolayca düzenlersin)
-          cat > data/daily-report-tmp.json <<JSON
+          cat <<JSON > data/daily-report-tmp.json
 {
   "dailyReport": {
     "date": "$NOW",
@@ -182,27 +175,26 @@ JSON
   }
 }
 JSON
-
           python3 - <<'PY'
-import json,sys
-p='data/panel.json'; q='data/daily-report-tmp.json'
-with open(p,'r',encoding='utf-8') as f: A=json.load(f)
-with open(q,'r',encoding='utf-8') as f: B=json.load(f)
-A['dailyReport']=B['dailyReport']
-with open(p,'w',encoding='utf-8') as f: json.dump(A,f,indent=2,ensure_ascii=False)
+import json
+with open('data/panel.json','r',encoding='utf-8') as f: a=json.load(f)
+with open('data/daily-report-tmp.json','r',encoding='utf-8') as f: b=json.load(f)
+a['dailyReport']=b['dailyReport']
+with open('data/panel.json','w',encoding='utf-8') as f: json.dump(a,f,indent=2,ensure_ascii=False)
 print("Merged dailyReport into data/panel.json")
 PY
           rm -f data/daily-report-tmp.json
 
-      - name: Commit & Push if changed
+      - name: Commit & Push if changes
         shell: bash
         run: |
+          set -e
           git config user.name  "voltai-operator"
           git config user.email "operator@users.noreply.github.com"
           git add -A
           if git diff --cached --quiet; then
             echo "No changes."
           else
-            git commit -m "panel: update data & ensure admin UI"
+            git commit -m "feat(panel): daily report + panel update"
             git push
           fi
