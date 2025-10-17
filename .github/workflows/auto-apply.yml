@@ -1,102 +1,43 @@
 name: AI Auto Apply
 
 on:
-  issues:
-    types: [opened, edited, labeled]
   issue_comment:
     types: [created]
 
 permissions:
   contents: write
   issues: write
+  pull-requests: write
 
 jobs:
   apply:
-    if: >
-      contains(github.event.issue.labels.*.name, 'autodev') ||
-      startsWith(github.event.comment.body, '/autodev')
+    if: github.event.comment.body && startsWith(github.event.comment.body, 'ONAY:')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Determine command text
-        id: cmd
+      - name: Extract command text
+        id: extract
         run: |
-          if [ "${{ github.event_name }}" = "issue_comment" ]; then
-            echo "text=${{ github.event.comment.body }}" >> $GITHUB_OUTPUT
-          else
-            echo "text=${{ github.event.issue.body }}" >> $GITHUB_OUTPUT
-          fi
+          body="${{ github.event.comment.body }}"
+          echo "COMMAND=${body#ONAY: }" >> $GITHUB_ENV
 
-      - name: Apply changes based on command
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
+      - name: Apply command to panel.json
+        run: |
+          mkdir -p data
+          if [ ! -f data/panel.json ]; then echo '{"dailyReport":{"urgent":[]}}' > data/panel.json; fi
+          node -e "
+          const fs=require('fs');
+          const d=JSON.parse(fs.readFileSync('data/panel.json'));
+          d.dailyReport.urgent.push(process.env.COMMAND);
+          fs.writeFileSync('data/panel.json',JSON.stringify(d,null,2));
+          "
 
-            const text = `${{ steps.cmd.outputs.text }}`.trim();
-            core.info('CMD TEXT: ' + text);
-
-            const ROOT = process.cwd();
-            const adminDir = path.join(ROOT, 'admin');
-            const indexHtml = path.join(adminDir, 'index.html');
-
-            function ensureDir(p){ if(!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true }); }
-            function write(p, s){ ensureDir(path.dirname(p)); fs.writeFileSync(p, s); core.info('WROTE ' + path.relative(ROOT, p)); }
-            function read(p){ return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : ''; }
-
-            // Tek-dosya admin panel şablonu (gömülü CSS+JS)
-            const ONE_FILE_PANEL = `<!DOCTYPE html>
-            <html lang="tr"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-            <title>VoltAIRepair • Admin Panel</title>
-            <style>
-              :root{--bg:#0b0f1a;--panel:#0f1524;--card:#111b2e;--muted:#9fb2d0;--text:#e9f0ff;--brand:#2fb3ff;--border:rgba(255,255,255,.06)}
-              *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:500 16px/1.5 system-ui,-apple-system,Segoe UI,Roboto}
-              .wrap{max-width:1040px;margin:0 auto;padding:24px}
-              .topbar{position:sticky;top:0;background:linear-gradient(var(--bg),transparent 70%);padding:16px 0 6px}
-              .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:22px}
-              .brand b{color:var(--brand)} .badge{margin-left:auto;padding:.4rem .6rem;border-radius:999px;background:var(--card);border:1px solid var(--border);color:#9fb2d0;font-size:13px}
-              .menu{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
-              .btn{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:.6rem .85rem;border-radius:10px;text-decoration:none;font-weight:700}
-              .grid{display:grid;gap:16px;margin-top:18px} @media(min-width:740px){.grid{grid-template-columns:repeat(3,1fr)}}
-              .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;min-height:140px;display:flex;flex-direction:column;justify-content:center}
-              .card h3{margin:0 0 6px;font-size:14px;color:#9fb2d0;letter-spacing:.4px}.card .val{font-size:40px;font-weight:800}
-              .rows{display:grid;gap:16px;margin-top:16px} @media(min-width:740px){.rows{grid-template-columns:2fr 1fr}}
-              table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
-              th,td{padding:12px 14px;border-bottom:1px solid var(--border);font-size:14px} th{color:#9fb2d0;text-align:left;font-weight:700} tr:last-child td{border-bottom:none}
-              .muted{color:#9fb2d0}.pill{display:inline-block;padding:.25rem .6rem;border-radius:999px;background:#0e2038;border:1px solid var(--border);font-size:12px;color:#9fb2d0}
-              footer{margin:28px 0 12px;color:#9fb2d0;font-size:13px}
-            </style></head>
-            <body><div class="wrap">
-              <div class="topbar">
-                <div class="brand"><span>⚙️</span><span>VoltAIRepair • <b>Admin Panel</b></span><span class="badge" id="demoFlag">Demo veri</span></div>
-                <div class="menu">
-                  <a class="btn" href="../index.html">🏠 Ana Sayfa</a>
-                  <a class="btn" href="../ai-technician.html">🧠 AI Technician</a>
-                  <a class="btn" href="../repair-cloud.html">☁️ Repair Cloud</a>
-                  <a class="btn" href="../learning-hub.html">📚 Learning Hub</a>
-                </div>
-              </div>
-              <section class="grid" aria-label="istatistik">
-                <div class="card"><h3>TOPLAM KAYIT</h3><div class="val" id="total">—</div></div>
-                <div class="card"><h3>SON 24 SAAT</h3><div class="val" id="new24">—</div></div>
-                <div class="card"><h3>TAMAMLAMA</h3><div class="val" id="completion">—</div></div>
-              </section>
-              <section class="rows">
-                <div>
-                  <table aria-label="son 24 saat en çok kodlar">
-                    <thead><tr><th>Panik Kodu</th><th>Adet</th><th class="muted">Model / iOS</th></tr></thead>
-                    <tbody id="top-codes"><tr><td colspan="3" class="muted">Yükleniyor…</td></tr></tbody>
-                  </table>
-                </div>
-                <div>
-                  <table aria-label="log"><thead><tr><th>Günlük</th></tr></thead><tbody id="log"><tr><td class="muted">Başlatılıyor…</td></tr></tbody></table>
-                </div>
-              </section>
-              <footer>© VoltAIRepair • panel v1</footer>
-            </div>
-            <script>
-              const data = { total:1284, new24:36, completion:36,
-                topCodes:[{code:"0x8000_002",count:15,models:["iPhone 11","XR"],ios:["17.6","17.6.1"]},{code:"0
+      - name: Commit and Push
+        run: |
+          git config user.name 'github-actions'
+          git config user.email 'actions@github.com'
+          git add data/panel.json
+          git commit -m 'Auto apply ONAY update'
+          git push
