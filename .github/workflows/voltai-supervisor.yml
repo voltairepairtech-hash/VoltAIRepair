@@ -23,14 +23,15 @@ jobs:
         id: read
         run: |
           echo "TALIMAT=${{ github.event.inputs.talimat }}" >> $GITHUB_ENV
-          echo "Kullanıcı talimatı: ${{ github.event.inputs.talimat }}"
+          echo "📥 Kullanıcı talimatı: ${{ github.event.inputs.talimat }}"
 
       - name: Ortamı hazırla
         run: |
           sudo apt-get update -y
           sudo apt-get install -y jq
           mkdir -p data
-touch data/panel.json
+          touch data/panel.json
+
       - name: panel.json oluştur (yoksa)
         run: |
           if [ ! -f data/panel.json ]; then
@@ -43,7 +44,7 @@ touch data/panel.json
           DATE=$(date -u +"%Y-%m-%d")
           jq --arg d "$DATE" '.dailyReport.date=$d | .updatedAt=now | todate' data/panel.json > data/tmp.json
           mv data/tmp.json data/panel.json
-          echo "✅ Günlük rapor oluşturuldu."
+          echo "✅ Günlük rapor oluşturuldu ($DATE)."
 
       - name: Kaynak ekle
         if: contains(env.TALIMAT, 'kaynak ekle')
@@ -60,3 +61,4 @@ touch data/panel.json
           git add -A
           git diff --cached --quiet || git commit -m "auto: VoltAI Supervisor güncelleme"
           git push
+          echo "🚀 Güncelleme gönderildi."
