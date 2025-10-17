@@ -1,30 +1,60 @@
 name: Update Panel Data
+
 on:
   schedule:
-    - cron: "0 */6 * * *"
-  workflow_dispatch:
+    - cron: '*/30 * * * *'   # her 30 dakikada bir
+  workflow_dispatch:          # elle “Run workflow” ile tetikleme
+
+permissions:
+  contents: write             # bu workflow’un depoya yazma izni
 
 jobs:
   update:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-
-      - name: Update panel.json
+      - name: Create/Update data/panel.json
         run: |
           mkdir -p data
-          echo "{\"last_update\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\", \"total_records\": $((RANDOM % 2000 + 500)), \"new_last_24h\": $((RANDOM % 100))) }" > data/panel.json
+          TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          TOTAL=$((RANDOM % 900 + 800))   # demo: 800–1699 arası
+          NEW24=$((RANDOM % 60 + 10))     # demo: 10–69 arası
+          COMP=$((RANDOM % 60 + 20))      # demo: 20–79 arası
 
-      - name: Commit & push
+          cat > data/panel.json <<'JSON'
+          {
+            "total": __TOTAL__,
+            "new24": __NEW24__,
+            "completion": __COMP__,
+            "topCodes": [
+              { "code": "0x8000_002", "count": 5, "models": ["iPhone 11","iPhone 12"] },
+              { "code": "0x6000_133", "count": 4, "models": ["iPhone XR","iPhone 11"] },
+              { "code": "0x5000_0A4", "count": 3, "models": ["iPhone 8","iPhone SE (2nd)"] }
+            ],
+            "updatedAt": "__TS__"
+          }
+          JSON
+
+          sed -i "s/__TOTAL__/$TOTAL/" data/panel.json
+          sed -i "s/__NEW24__/$NEW24/" data/panel.json
+          sed -i "s/__COMP__/$COMP/"   data/panel.json
+          sed -i "s|__TS__|$TS|"       data/panel.json
+
+      - name: Commit (only if changed)
         run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
+          if git diff --quiet; then
+            echo "No changes to commit"; exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/panel.json
-          git commit -m "Auto update panel data"
-          git push
+          git commit -m "chore(panel): auto-update panel.json at $TS"
+
+      - name: Push
+        uses: ad-m/github-push-action@v0.8.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
