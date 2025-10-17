@@ -1,1 +1,11 @@
-{"last_update": "2025-10-17T05:16:20Z", "total_records": 1385, "new_last_24h": 10) }
+{
+  "total": 1512,
+  "new24": 12,
+  "completion": 35,
+  "topCodes": [
+    { "code": "0x8000_002", "count": 5, "models": ["iPhone 11","iPhone 12"] },
+    { "code": "0x6000_133", "count": 4, "models": ["iPhone XR","iPhone 11"] },
+    { "code": "0x5000_0A4", "count": 3, "models": ["iPhone 8","iPhone SE (2nd)"] }
+  ],
+  "updatedAt": "2025-10-17T05:28:32Z"
+}
