@@ -1,0 +1,27 @@
+name: Cleanup Duplicate Index Files
+
+on:
+  workflow_dispatch:
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Delete duplicate index.html files
+        run: |
+          echo "🔍 Checking for index files..."
+          rm -f index.html || true
+          rm -f admin/index.html || true
+          echo "✅ Removed root and admin index files (if existed)."
+          echo "<!doctype html><html><head><meta charset='utf-8'><title>VoltAI Repair</title></head><body><h1>Yeni Sistem Kurulumu Başarılı</h1><p>Temiz başlangıç tamamlandı.</p></body></html>" > index.html
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "voltairrepairtech-hash"
+          git config user.email "actions@github.com"
+          git add .
+          git commit -m "Cleanup duplicate index files and recreate clean index.html" || echo "No changes to commit"
+          git push
