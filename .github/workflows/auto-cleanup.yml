@@ -1,0 +1,60 @@
+name: Auto Cleanup (safe)
+on:
+  workflow_dispatch: {}   # Elle çalıştır
+  push:
+    paths-ignore:
+      - ".github/workflows/**"  # normal commitlerde gereksiz tetiklenmesin
+
+jobs:
+  tidy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure .nojekyll (Pages için)
+        run: |
+          [ -f .nojekyll ] || touch .nojekyll
+
+      - name: Ensure 404.html (fallback)
+        run: |
+          if [ ! -f 404.html ]; then
+            cat > 404.html <<'HTML'
+            <!doctype html><meta charset="utf-8">
+            <title>404 | VoltAIRepair</title>
+            <style>body{font-family:system-ui;background:#0d1117;color:#e6edf3;text-align:center;padding:64px}</style>
+            <h1>404</h1><p>Sayfa bulunamadı.</p>
+            <p><a href="/VoltAIRepair/">Ana sayfaya dön</a></p>
+            HTML
+          fi
+
+      - name: Ensure root index.html redirects to admin
+        run: |
+          NEED_REDIRECT=0
+          if [ -f index.html ]; then
+            grep -qi 'VoltAIRepair/admin/index.html' index.html || NEED_REDIRECT=1
+          else
+            NEED_REDIRECT=1
+          fi
+          if [ $NEED_REDIRECT -eq 1 ]; then
+            cat > index.html <<'HTML'
+            <!doctype html>
+            <meta charset="utf-8">
+            <title>VoltAIRepair</title>
+            <meta http-equiv="refresh" content="0; url=/VoltAIRepair/admin/index.html">
+            <script>location.replace('/VoltAIRepair/admin/index.html');</script>
+            HTML
+          fi
+
+      - name: Commit changes (if any)
+        run: |
+          git config user.name "voltai-automation"
+          git config user.email "actions@github.com"
+          if ! git diff --quiet; then
+            git add -A
+            git commit -m "auto-cleanup: ensure .nojekyll, 404.html, index redirect"
+            git push
+          else
+            echo "No changes needed."
+          fi
