@@ -42,7 +42,7 @@ jobs:
         if: contains(env.TALIMAT, 'günlük rapor')
         run: |
           DATE=$(date -u +"%Y-%m-%d")
-          jq --arg d "$DATE" '.dailyReport.date=$d | .updatedAt=now | todate' data/panel.json > data/tmp.json
+          jq --arg d "$DATE" '.dailyReport.date=$d | .updatedAt=$d' data/panel.json > data/tmp.json
           mv data/tmp.json data/panel.json
           echo "✅ Günlük rapor oluşturuldu ($DATE)."
 
