@@ -1,13 +1,1 @@
-{
-  "updated_at": "2025-01-01T00:00:00Z",
-  "totals": {
-    "technical_records": 1284,
-    "new_last_24h": 36,
-    "completion_percent": 36
-  },
-  "top_panic_codes_24h": [
-    {"code": "0x8000_002", "count": 5, "ios": "17.5", "models": ["iPhone 11", "iPhone 12"]},
-    {"code": "0x6000_133", "count": 4, "ios": "16.7", "models": ["iPhone Xr"]},
-    {"code": "0x5000_0A4", "count": 3, "ios": "17.2", "models": ["iPhone 11 Pro"]}
-  ]
-}
+{"last_update": "2025-10-17T05:16:20Z", "total_records": 1385, "new_last_24h": 10) }
