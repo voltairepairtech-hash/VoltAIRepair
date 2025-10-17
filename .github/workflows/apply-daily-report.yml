@@ -13,19 +13,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Ensure folders
+      - name: Prepare folders
         run: |
-          mkdir -p admin admin/admin data
+          mkdir -p admin/admin data
 
-      - name: Patch admin/index.html (add dailyReport container + script if missing)
+      - name: Patch admin/index.html
         shell: bash
         run: |
           if [ -f admin/index.html ]; then
             if ! grep -q 'id="dailyReport"' admin/index.html; then
-              sed -i 's#</body>#  <section id="dailyReport" class="card" style="margin-top:16px;"></section>\n</body>#' admin/index.html || true
+              sed -i 's#</body>#  <section id="dailyReport" class="card" style="margin-top:16px;"></section>\n</body>#' admin/index.html
             fi
             if ! grep -q 'admin/admin/dashboard.js' admin/index.html; then
-              sed -i 's#</body>#  <script src="./admin/admin/dashboard.js"></script>\n</body>#' admin/index.html || true
+              sed -i 's#</body>#  <script src="./admin/admin/dashboard.js"></script>\n</body>#' admin/index.html
             fi
           else
             cat > admin/index.html <<'HTML'
@@ -44,14 +44,13 @@ jobs:
 HTML
           fi
 
-      - name: Add/patch admin/admin/dashboard.js (live JSON + daily report render)
+      - name: Add dashboard script
         run: |
           cat > admin/admin/dashboard.js <<'JS'
-// admin/admin/dashboard.js — Daily Report
-console.log("Dashboard loaded");
+console.log("Dashboard loaded - test OK");
 JS
 
-      - name: Merge/seed data/panel.json with Daily Report
+      - name: Create/merge data file
         run: |
           mkdir -p data
           echo '{"dailyReport":{"status":"ok"}}' > data/panel.json
@@ -61,5 +60,5 @@ JS
           git config user.name  "voltai-operator"
           git config user.email "operator@users.noreply.github.com"
           git add -A
-          git commit -m "feat(panel): add Daily Report section and data" || echo "No changes"
+          git commit -m "test: daily-report workflow OK" || echo "No changes"
           git push
