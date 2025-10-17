@@ -1,0 +1,110 @@
+name: VoltAI Supervisor
+
+on:
+  # Telefonda "Run workflow" tıklayıp tek bir cümle yazman yeterli.
+  workflow_dispatch:
+    inputs:
+      talimat:
+        description: "Ne yapılsın? (ör: günlük rapor oluştur, kaynak ekle: ...)"
+        required: true
+        type: string
+  # İstersen sadece bir GitHub Issue açıp talimatı başlığa yaz: "ONAY: ..."
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Talimatı al
+        id: intent
+        shell: bash
+        run: |
+          # 1) workflow_dispatch ile geldiyse
+          TALI="${{ github.event.inputs.talimat }}"
+          # 2) Issue ile geldiyse (başlık + gövde)
+          if [ -z "$TALI" ] && [ "${{ github.event_name }}" = "issues" ]; then
+            TALI="$(printf "%s\n\n%s" "${{ github.event.issue.title }}" "${{ github.event.issue.body }}")"
+          fi
+          TALI_LOWER="$(echo "$TALI" | tr '[:upper:]' '[:lower:]')"
+          echo "Talimat: $TALI"
+          echo "lower=$TALI_LOWER" >> $GITHUB_OUTPUT
+
+      - name: Ortamı hazırla (jq vs.)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq
+          mkdir -p data
+
+      - name: panel.json yoksa oluştur
+        run: |
+          if [ ! -f data/panel.json ]; then
+            cat > data/panel.json <<'JSON'
+{
+  "totals": { "records": 0, "new24h": 0, "completionPct": 0 },
+  "updatedAt": "1970-01-01T00:00:00Z"
+}
+JSON
+          fi
+
+      - name: Günlük rapor oluştur (doğal dil: "günlük rapor")
+        if: contains(steps.intent.outputs.lower, 'günlük rapor')
+        run: |
+          NOW=$(date -u +"%Y-%m-%d")
+          # Örnek rapor blokları – ileride senin cümlelerinle dolacak
+          REPORT=$(jq -n --arg d "$NOW" \
+            --argjson src '["ifixit/iphone-11-charging-guide","reddit/ios-panic-log-fixes","youtube/board-repair-lab-tristar-measure"]' \
+            --argjson leads '["JBC Tools (warm)","Kaisi (warm)"]' \
+            --argjson aff '["AtlasBookNet-Amazon-US","AtlasBookNet-Tooling-Bundle"]' \
+            --argjson urg '["Panic code map iOS 18.x","Update cron drift"]' \
+            '{dailyReport:{date:$d,newSourcesTop10:$src,sponsorsLeads:$leads,affiliateBlocks:$aff,urgent:$urg}}' )
+
+          # panel.json içine merge et
+          jq --arg now "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+             --slurpfile rep <(echo "$REPORT") \
+             '.[0] * $rep[0] | .updatedAt=$now' data/panel.json > data/panel.tmp.json
+          mv data/panel.tmp.json data/panel.json
+          echo "Günlük rapor eklendi."
+
+      - name: Kaynak ekle (doğal dil: "kaynak ekle:")
+        if: contains(steps.intent.outputs.lower, 'kaynak ekle')
+        run: |
+          # "kaynak ekle: a, b, c" formatındaki satırı ayıkla
+          LINE="$(echo '${{ steps.intent.outputs.lower }}' | tr '\n' ' ' | sed -E 's/.*kaynak ekle:([^\"]*).*/\1/i')"
+          # virgülle ayrılmış liste -> JSON dizi
+          ARR=$(echo "$LINE" | awk -F: '{print $2}' | tr ',' '\n' | sed 's/^ *//;s/ *$//' | jq -R . | jq -s .)
+          if [ -z "$ARR" ] || [ "$ARR" = "null" ]; then ARR='[]'; fi
+
+          jq --argjson addlist "$ARR" '
+            .dailyReport = (.dailyReport // {})
+            | .dailyReport.newSourcesTop10 = ((.dailyReport.newSourcesTop10 // []) + $addlist)
+            | .updatedAt = (now | todate)
+          ' data/panel.json > data/panel.tmp.json
+          mv data/panel.tmp.json data/panel.json
+          echo "Yeni kaynaklar eklendi: $ARR"
+
+      - name: Sadece log at (tanınmayan talimat)
+        if: |
+          !contains(steps.intent.outputs.lower, 'günlük rapor') &&
+          !contains(steps.intent.outputs.lower, 'kaynak ekle')
+        run: |
+          echo "Talimat anlaşıldı fakat otomatik şablonlardan birine uymuyor."
+          echo "Örnekler: 'günlük rapor', 'kaynak ekle: link1, link2'"
+
+      - name: Commit & Push (değişiklik varsa)
+        run: |
+          git config user.name  "VoltAI Supervisor"
+          git config user.email "operator@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Değişiklik yok."
+          else
+            git commit -m "chore(supervisor): otomatik uygulama"
+            git push
+          fi
