@@ -1,60 +1,208 @@
 name: Update Panel Data
 
 on:
+  # Elle çalıştırma (GitHub uygulamasından Run Workflow ile)
+  workflow_dispatch:
+  # Otomatik çalışma (günde 4 kez)
   schedule:
-    - cron: '*/30 * * * *'   # her 30 dakikada bir
-  workflow_dispatch:          # elle “Run workflow” ile tetikleme
+    - cron: "0 */6 * * *"
 
 permissions:
-  contents: write             # bu workflow’un depoya yazma izni
+  contents: write
+
+# Aynı anda birden fazla run çakışmasın
+concurrency:
+  group: panel-update
+  cancel-in-progress: false
 
 jobs:
-  update:
+  panel:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Create/Update data/panel.json
+      - name: Ensure folders
         run: |
-          mkdir -p data
-          TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          TOTAL=$((RANDOM % 900 + 800))   # demo: 800–1699 arası
-          NEW24=$((RANDOM % 60 + 10))     # demo: 10–69 arası
-          COMP=$((RANDOM % 60 + 20))      # demo: 20–79 arası
+          mkdir -p admin admin/admin data
 
-          cat > data/panel.json <<'JSON'
-          {
-            "total": __TOTAL__,
-            "new24": __NEW24__,
-            "completion": __COMP__,
-            "topCodes": [
-              { "code": "0x8000_002", "count": 5, "models": ["iPhone 11","iPhone 12"] },
-              { "code": "0x6000_133", "count": 4, "models": ["iPhone XR","iPhone 11"] },
-              { "code": "0x5000_0A4", "count": 3, "models": ["iPhone 8","iPhone SE (2nd)"] }
-            ],
-            "updatedAt": "__TS__"
-          }
-          JSON
-
-          sed -i "s/__TOTAL__/$TOTAL/" data/panel.json
-          sed -i "s/__NEW24__/$NEW24/" data/panel.json
-          sed -i "s/__COMP__/$COMP/"   data/panel.json
-          sed -i "s|__TS__|$TS|"       data/panel.json
-
-      - name: Commit (only if changed)
+      - name: Patch admin/index.html (create if missing)
+        shell: bash
         run: |
-          if git diff --quiet; then
-            echo "No changes to commit"; exit 0
+          if [ -f admin/index.html ]; then
+            # Günlük rapor alanı yoksa ekle
+            if ! grep -q 'id="dailyReport"' admin/index.html; then
+              sed -i 's#</body>#  <section id="dailyReport" class="card" style="margin-top:16px;"></section>\n</body>#' admin/index.html || true
+            fi
+            # dashboard.js tag'i yoksa ekle
+            if ! grep -q 'admin/admin/dashboard.js' admin/index.html; then
+              sed -i 's#</body>#  <script src="./admin/admin/dashboard.js"></script>\n</body>#' admin/index.html || true
+            fi
+          else
+            cat > admin/index.html <<'HTML'
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>VoltAIRepair • Admin Panel</title>
+  <style>
+    body{background:#0b1220;color:#e5e7eb;font-family:ui-sans-serif,system-ui,-apple-system;max-width:960px;margin:24px auto;padding:0 12px}
+    .badge{display:inline-block;padding:.2rem .5rem;border-radius:8px;background:#1f2937;color:#9ca3af;margin-left:.5rem}
+    .badge.live{background:#083344;color:#93c5fd}
+    .card{background:#0f172a;border:1px solid #1f2937;border-radius:12px;padding:16px}
+    ul{margin:.4rem 0 .8rem 1.2rem}
+    h3{margin:0 0 .25rem 0}
+    .muted{color:#94a3b8;font-size:.9rem}
+  </style>
+</head>
+<body>
+  <h1>VoltAIRepair • Admin Panel <span id="badgeMode" class="badge">Demo veri</span></h1>
+  <div class="card" style="margin-top:12px;display:grid;gap:12px;grid-template-columns:repeat(3,minmax(0,1fr))">
+    <div><div class="muted">Toplam Kayıt</div><div style="font-size:1.6rem" id="totalCount">0</div></div>
+    <div><div class="muted">Son 24 Saat</div><div style="font-size:1.6rem" id="new24">+0</div></div>
+    <div><div class="muted">Tamamlama</div><div style="font-size:1.6rem" id="completePct">0%</div></div>
+  </div>
+  <section id="dailyReport" class="card" style="margin-top:16px;"></section>
+  <script src="./admin/admin/dashboard.js"></script>
+</body>
+</html>
+HTML
           fi
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/panel.json
-          git commit -m "chore(panel): auto-update panel.json at $TS"
 
-      - name: Push
-        uses: ad-m/github-push-action@v0.8.0
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ github.ref }}
+      - name: Ensure admin/admin/dashboard.js (render & live JSON)
+        run: |
+          cat > admin/admin/dashboard.js <<'JS'
+// admin/admin/dashboard.js — Canlı JSON + Günlük Rapor render
+
+const ui = {
+  total: document.getElementById('totalCount'),
+  new24: document.getElementById('new24'),
+  comp:  document.getElementById('completePct'),
+  badge: document.getElementById('badgeMode'),
+};
+
+const LIVE_JSON = location.origin + location.pathname.replace(/\/admin\/?.*$/,'') + "/data/panel.json?bust=" + Date.now();
+
+const demo = {
+  totals: { records: 1284, new24h: 36, completionPct: 36 },
+  dailyReport: null
+};
+
+function applyStats(data, isLive){
+  try{
+    const t = data.totals || {};
+    if (ui.total) ui.total.textContent = (t.records ?? 0).toLocaleString('tr-TR');
+    if (ui.new24) ui.new24.textContent = "+" + (t.new24h ?? 0);
+    if (ui.comp)  ui.comp.textContent  = (t.completionPct ?? 0) + "%";
+    if (ui.badge){
+      ui.badge.textContent = isLive ? "Canlı veri" : "Demo veri";
+      ui.badge.className = isLive ? "badge live" : "badge";
+    }
+    renderDailyReport(data);
+  }catch(e){ console.warn(e); }
+}
+
+function renderDailyReport(data){
+  const el = document.getElementById('dailyReport');
+  if (!el) return;
+  const r = data.dailyReport;
+  if (!r){
+    el.innerHTML = '<div class="muted">Günlük rapor henüz eklenmedi.</div>';
+    return;
+  }
+  const li = a => (a||[]).map(x=>`<li>${x}</li>`).join("");
+  el.innerHTML = `
+    <h3>Günlük İlerleme (${r.date})</h3>
+    <div class="muted">iPhone Repair Atlas</div>
+    <div style="display:grid;gap:12px;margin-top:10px">
+      <div class="card"><b>Yeni Kaynaklar (Top 10)</b><ul>${li(r.newSourcesTop10)}</ul></div>
+      <div class="card"><b>Sponsor/İlan Lead'leri</b><ul>${li(r.sponsorsLeads)}</ul></div>
+      <div class="card"><b>AtlasBookNet Affiliate Blokları</b><ul>${li(r.affiliateBlocks)}</ul></div>
+      <div class="card"><b>Acil Aksiyonlar</b><ul>${li(r.urgent)}</ul></div>
+    </div>`;
+}
+
+async function load(){
+  try{
+    const res = await fetch(LIVE_JSON, {cache:"no-store"});
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const json = await res.json();
+    if (!json.totals && json.total){
+      json.totals = { records: json.total, new24h: json.new24, completionPct: json.completion };
+    }
+    applyStats(json, true);
+  }catch(e){
+    console.warn("Canlı veri okunamadı, demo:", e);
+    applyStats(demo, false);
+  }
+}
+document.addEventListener("DOMContentLoaded", load);
+JS
+
+      - name: Seed data/panel.json if missing + merge daily report
+        shell: bash
+        run: |
+          NOW=$(date -u +"%Y-%m-%d")
+          mkdir -p data
+          if [ ! -f data/panel.json ]; then
+            cat > data/panel.json <<JSON
+{
+  "totals": { "records": 1284, "new24h": 36, "completionPct": 36 },
+  "updatedAt": "1970-01-01T00:00:00Z"
+}
+JSON
+          fi
+
+          # Örnek günlük rapor (sonra kolayca düzenlersin)
+          cat > data/daily-report-tmp.json <<JSON
+{
+  "dailyReport": {
+    "date": "$NOW",
+    "newSourcesTop10": [
+      "ifixit/iphone-11-charging-guide",
+      "apple-discussions/panic-0x8000_002-thread",
+      "gsmhosting/iphone-11-tristar-qc",
+      "notion/atlas-build-notes-#23",
+      "youtube/board-repair-lab-tristar-measure",
+      "reddit/ios-panic-log-fixes",
+      "medium/dfu-diagnosis-ios17",
+      "apple-security/kernel-panic-doc",
+      "wikipedia/lightning-pinout",
+      "github/boardview-tools"
+    ],
+    "sponsorsLeads": ["JBC Tools (warm)", "QUCC Battery (cold)", "Kaisi (warm)"],
+    "affiliateBlocks": ["AtlasBookNet-Amazon-US", "AtlasBookNet-Aliexpress", "AtlasBookNet-Tooling-Bundle"],
+    "urgent": [
+      "Fix: Update-Panel workflow cron drift",
+      "Add: Panic code map for iOS 18.x",
+      "Docs: Measurement photos for iPhone 12 PM VBUS rail"
+    ]
+  }
+}
+JSON
+
+          python3 - <<'PY'
+import json,sys
+p='data/panel.json'; q='data/daily-report-tmp.json'
+with open(p,'r',encoding='utf-8') as f: A=json.load(f)
+with open(q,'r',encoding='utf-8') as f: B=json.load(f)
+A['dailyReport']=B['dailyReport']
+with open(p,'w',encoding='utf-8') as f: json.dump(A,f,indent=2,ensure_ascii=False)
+print("Merged dailyReport into data/panel.json")
+PY
+          rm -f data/daily-report-tmp.json
+
+      - name: Commit & Push if changed
+        shell: bash
+        run: |
+          git config user.name  "voltai-operator"
+          git config user.email "operator@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes."
+          else
+            git commit -m "panel: update data & ensure admin UI"
+            git push
+          fi
