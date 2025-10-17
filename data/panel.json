@@ -28,10 +28,11 @@
       ]
     }
   ],
-  "updatedAt": "2025-10-17T09:54:31Z",
+  "updatedAt": "2025-10-17",
   "dailyReport": {
     "urgent": [
       "JSON güncelleme testi 1"
-    ]
+    ],
+    "date": "2025-10-17"
   }
 }
