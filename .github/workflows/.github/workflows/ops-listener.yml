@@ -1,0 +1,121 @@
+name: Ops Listener (Natural Language → Auto Apply)
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: write
+  issues: read
+
+jobs:
+  apply_on_approval:
+    if: >
+      github.event.issue.pull_request == null &&
+      contains(toLower(github.event.comment.body), 'onay:') &&
+      (
+        github.event.comment.author_association == 'OWNER' ||
+        github.event.comment.author_association == 'MEMBER'
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure data folder and seed panel.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data
+          if [ ! -f data/panel.json ]; then
+            cat > data/panel.json <<'JSON'
+{
+  "totals": { "records": 1284, "new24h": 36, "completionPct": 36 },
+  "dailyReport": {
+    "date": "1970-01-01",
+    "newSourcesTop10": [],
+    "sponsorsLeads": [],
+    "affiliateBlocks": [],
+    "urgent": []
+  },
+  "updatedAt": "1970-01-01T00:00:00Z"
+}
+JSON
+          fi
+
+      - name: Parse comment → fields
+        id: parse
+        shell: bash
+        env:
+          RAW: ${{ github.event.comment.body }}
+        run: |
+          set -euo pipefail
+          # Yorumdan "ONAY:" sonrası tüm satırı al
+          line=$(printf "%s" "$RAW" | tr -d '\r' | awk -F'ONAY:' 'NF>1{print $2}' | sed 's/^[[:space:]]*//')
+          # Basit şablon: alanları ; ile ayırabilirsin (opsiyonel)
+          # Örn: ONAY: kaynak=ifixit; sponsor=Kaisi; affiliate=Amazon-US; acil=Log map iOS18
+          kv() { printf "%s" "$line" | tr ';' '\n' | awk -F'=' -v k="$1" 'tolower($1)==k{print substr($0,index($0,"=")+1)}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'; }
+          SRC=$(kv kaynak || true)
+          SPN=$(kv sponsor || true)
+          AFF=$(kv affiliate || true)
+          URG=$(kv acil || true)
+
+          # Eğer anahtar yoksa tüm metni "urgent"e düşür
+          if [ -z "${SRC:-}" ] && [ -z "${SPN:-}" ] && [ -z "${AFF:-}" ] && [ -z "${URG:-}" ]; then
+            URG="$line"
+          fi
+
+          echo "src=$SRC"   >> $GITHUB_OUTPUT
+          echo "spn=$SPN"   >> $GITHUB_OUTPUT
+          echo "aff=$AFF"   >> $GITHUB_OUTPUT
+          echo "urg=$URG"   >> $GITHUB_OUTPUT
+
+      - name: Merge into data/panel.json
+        shell: bash
+        env:
+          SRC: ${{ steps.parse.outputs.src }}
+          SPN: ${{ steps.parse.outputs.spn }}
+          AFF: ${{ steps.parse.outputs.aff }}
+          URG: ${{ steps.parse.outputs.urg }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+import json, os, datetime
+p='data/panel.json'
+with open(p,'r',encoding='utf-8') as f: panel=json.load(f)
+
+today=datetime.datetime.utcnow().strftime('%Y-%m-%d')
+panel['dailyReport']=panel.get('dailyReport',{}) or {}
+panel['dailyReport']['date']=today
+panel['dailyReport'].setdefault('newSourcesTop10',[])
+panel['dailyReport'].setdefault('sponsorsLeads',[])
+panel['dailyReport'].setdefault('affiliateBlocks',[])
+panel['dailyReport'].setdefault('urgent',[])
+
+def add_if(val, arr):
+    if val and val.strip():
+        v=val.strip()
+        if v not in arr: arr.append(v)
+
+src=os.getenv('SRC',''); spn=os.getenv('SPN',''); aff=os.getenv('AFF',''); urg=os.getenv('URG','')
+add_if(src, panel['dailyReport']['newSourcesTop10'])
+add_if(spn, panel['dailyReport']['sponsorsLeads'])
+add_if(aff, panel['dailyReport']['affiliateBlocks'])
+add_if(urg, panel['dailyReport']['urgent'])
+
+with open(p,'w',encoding='utf-8') as f: json.dump(panel,f,indent=2,ensure_ascii=False)
+print("Updated", p)
+PY
+
+      - name: Commit & Push
+        shell: bash
+        run: |
+          git config user.name  "voltai-operator"
+          git config user.email "operator@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes."
+          else
+            git commit -m "ops: apply approval from issue comment"
+            git push
+          fi
