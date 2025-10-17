@@ -1,11 +1,207 @@
-name: Apply Daily Report
+name: AI Auto Apply
+
 on:
-  workflow_dispatch: {}
+  issue_comment:
+    types: [created]
+  issues:
+    types: [opened, edited, labeled]
+  workflow_dispatch:
+
 permissions:
   contents: write
+  issues: read
+  pull-requests: read
+
 jobs:
   apply:
+    if: >
+      (github.event_name == 'issue_comment' && 
+       github.event.issue.state == 'open' &&
+       contains(github.event.issue.labels.*.name, 'voltai-operator'))
+      || 
+      (github.event_name == 'issues' &&
+       github.event.action != 'closed' &&
+       contains(github.event.issue.labels.*.name, 'voltai-operator'))
+      ||
+      (github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: echo "✅ YAML çalışıyor!"
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract free-text instruction
+        id: text
+        run: |
+          mkdir -p .voltai
+          if [ "${{ github.event_name }}" = "issue_comment" ]; then
+            echo "${{ github.event.comment.body }}" > .voltai/instruction.txt
+          elif [ "${{ github.event_name }}" = "issues" ]; then
+            echo "${{ github.event.issue.body }}" > .voltai/instruction.txt
+          else
+            echo "Manual dispatch - edit .voltai/instruction.txt if needed" > .voltai/instruction.txt
+          fi
+          echo "----- INSTRUCTION -----"
+          cat .voltai/instruction.txt
+          echo "-----------------------"
+
+      - name: Ensure folders
+        run: |
+          mkdir -p admin admin/admin data
+
+      - name: Patch admin/index.html (ensure dailyReport + script)
+        run: |
+          if [ -f admin/index.html ]; then
+            if ! grep -q 'id="dailyReport"' admin/index.html; then
+              sed -i 's#</body>#  <section id="dailyReport" class="card" style="margin-top:16px;"></section>\n</body>#' admin/index.html || true
+            fi
+            if ! grep -q 'admin/admin/dashboard.js' admin/index.html; then
+              sed -i 's#</body>#  <script src="./admin/admin/dashboard.js"></script>\n</body>#' admin/index.html || true
+            fi
+          else
+            cat > admin/index.html <<'HTML'
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>VoltAIRepair • Admin Panel</title>
+  <style>
+    body{background:#0b1220;color:#e5e7eb;font-family:ui-sans-serif,system-ui,-apple-system;max-width:960px;margin:24px auto;padding:0 12px}
+    .badge{display:inline-block;padding:.2rem .5rem;border-radius:8px;background:#1f2937;color:#9ca3af;margin-left:.5rem}
+    .badge.live{background:#083344;color:#93c5fd}
+    .card{background:#0f172a;border:1px solid #1f2937;border-radius:12px;padding:16px}
+    ul{margin:.4rem 0 .8rem 1.2rem}
+    h3{margin:0 0 .25rem 0}
+    .muted{color:#94a3b8;font-size:.9rem}
+  </style>
+</head>
+<body>
+  <h1>VoltAIRepair • Admin Panel <span id="badgeMode" class="badge">Demo veri</span></h1>
+  <div class="card" style="margin-top:12px;display:grid;gap:12px;grid-template-columns:repeat(3,minmax(0,1fr))">
+    <div><div class="muted">Toplam Kayıt</div><div style="font-size:1.6rem" id="totalCount">0</div></div>
+    <div><div class="muted">Son 24 Saat</div><div style="font-size:1.6rem" id="new24">+0</div></div>
+    <div><div class="muted">Tamamlama</div><div style="font-size:1.6rem" id="completePct">0%</div></div>
+  </div>
+  <section id="dailyReport" class="card" style="margin-top:16px;"></section>
+  <script src="./admin/admin/dashboard.js"></script>
+</body>
+</html>
+HTML
+          fi
+
+      - name: Dashboard JS (live JSON + renderer)
+        run: |
+          cat > admin/admin/dashboard.js <<'JS'
+const ui = {
+  total: document.getElementById('totalCount'),
+  new24: document.getElementById('new24'),
+  comp:  document.getElementById('completePct'),
+  badge: document.getElementById('badgeMode'),
+};
+const LIVE_JSON = location.origin + location.pathname.replace(/\/admin\/.*/,'') + '/data/panel.json?bust=' + Date.now();
+const demo = { totals:{records:1284,new24h:36,completionPct:36}, dailyReport:null };
+
+function applyStats(data, isLive){
+  const t = data.totals || {};
+  if (ui.total) ui.total.textContent = (t.records ?? 0).toLocaleString('tr-TR');
+  if (ui.new24) ui.new24.textContent = "+" + (t.new24h ?? 0);
+  if (ui.comp)  ui.comp.textContent  = (t.completionPct ?? 0) + "%";
+  if (ui.badge){
+    ui.badge.textContent = isLive ? "Canlı veri" : "Demo veri";
+    ui.badge.className   = isLive ? "badge live" : "badge";
+  }
+  renderDailyReport(data);
+}
+function renderDailyReport(data){
+  const el = document.getElementById('dailyReport');
+  if (!el) return;
+  const r = data.dailyReport;
+  if (!r){ el.innerHTML = '<div class="muted">Günlük rapor henüz eklenmedi.</div>'; return; }
+  const li = a => (a||[]).map(x=>`<li>${x}</li>`).join("");
+  el.innerHTML = `
+    <h3>Günlük İlerleme (${r.date})</h3>
+    <div class="muted">iPhone Repair Atlas</div>
+    <div style="display:grid;gap:12px;margin-top:10px">
+      <div class="card"><b>Yeni Kaynaklar (Top 10)</b><ul>${li(r.newSourcesTop10)}</ul></div>
+      <div class="card"><b>Sponsor/İlan Lead'leri</b><ul>${li(r.sponsorsLeads)}</ul></div>
+      <div class="card"><b>AtlasBookNet Affiliate Blokları</b><ul>${li(r.affiliateBlocks)}</ul></div>
+      <div class="card"><b>Acil Aksiyonlar</b><ul>${li(r.urgent)}</ul></div>
+    </div>`;
+}
+async function load(){
+  try{
+    const res = await fetch(LIVE_JSON,{cache:"no-store"});
+    if(!res.ok) throw 0;
+    const json = await res.json();
+    if (!json.totals && json.total){
+      json.totals = {records:json.total,new24h:json.new24,completionPct:json.completion};
+    }
+    applyStats(json,true);
+  }catch{
+    applyStats(demo,false);
+  }
+}
+document.addEventListener("DOMContentLoaded", load);
+JS
+
+      - name: Build daily report JSON from natural text
+        run: |
+          NOW=$(date -u +"%Y-%m-%d")
+          mkdir -p data
+          # Panel.json yoksa iskelet
+          if [ ! -f data/panel.json ]; then
+            cat > data/panel.json <<JSON
+{
+  "totals": { "records": 1284, "new24h": 36, "completionPct": 36 },
+  "updatedAt": "1970-01-01T00:00:00Z"
+}
+JSON
+          fi
+
+          # Talimat metnini basit sezgisel kuralla bloklara ayır
+          # - madde işaretleri veya satır başlarına göre ayrıştırıyoruz
+          awk 'NF{print "- "$0}' .voltai/instruction.txt > .voltai/bullets.txt
+
+          # En sık anahtar kelimelere göre dört gruba dağıt
+          python3 - <<'PY'
+import json,re,datetime,sys
+from pathlib import Path
+
+bullets=Path(".voltai/bullets.txt").read_text(encoding="utf-8").splitlines()
+groups={"newSourcesTop10":[],"sponsorsLeads":[],"affiliateBlocks":[],"urgent":[]}
+for line in bullets:
+    s=line[2:].strip()
+    low=s.lower()
+    if any(k in low for k in ["kaynak","source","link","wiki","ifixit","youtube","github","doc"]):
+        groups["newSourcesTop10"].append(s)
+    elif any(k in low for k in ["sponsor","lead","reklam","ilan","partner"]):
+        groups["sponsorsLeads"].append(s)
+    elif any(k in low for k in ["affiliate","blok","amazon","aliexpress","ref"]):
+        groups["affiliateBlocks"].append(s)
+    elif any(k in low for k in ["acil","urgent","kritik","fix","bug","todo"]):
+        groups["urgent"].append(s)
+    else:
+        # sınıflanamayanlar acil'e düşsün
+        groups["urgent"].append(s)
+
+p=json.load(open("data/panel.json","r",encoding="utf-8"))
+p["dailyReport"]={
+    "date": datetime.datetime.utcnow().strftime("%Y-%m-%d"),
+    **groups
+}
+json.dump(p,open("data/panel.json","w",encoding="utf-8"),ensure_ascii=False,indent=2)
+print("panel.json updated")
+PY
+
+      - name: Commit & Push
+        run: |
+          git config user.name  "voltai-operator"
+          git config user.email "operator@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes."
+          else
+            MSG="ci(auto): apply command from issue #${{ github.event.issue.number || 'manual' }}"
+            git commit -m "$MSG"
+            git push
+          fi
