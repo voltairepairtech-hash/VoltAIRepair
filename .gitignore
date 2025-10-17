@@ -1,0 +1,9 @@
+# Genel
+.DS_Store
+node_modules/
+dist/
+.tmp/
+.cache/
+
+# Panel verisini asla dışlama
+!data/
