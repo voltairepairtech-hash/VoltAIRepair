@@ -1,0 +1,34 @@
+name: Auto Fix & Deploy
+on:
+  workflow_dispatch: {}   # Elle başlatılabilir
+  push:
+    paths:
+      - ".github/workflows/auto-fix.yml"  # Bu dosya değişirse otomatik tetiklenir
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # repo'ya yazma izni
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure root index.html redirects to admin
+        run: |
+          cat > index.html <<'HTML'
+          <!doctype html>
+          <meta charset="utf-8">
+          <title>VoltAIRepair</title>
+          <meta http-equiv="refresh" content="0; url=/VoltAIRepair/admin/index.html">
+          <script>location.replace('/VoltAIRepair/admin/index.html');</script>
+          HTML
+      - name: Commit if changed
+        run: |
+          git config user.name "voltairrepairtech-hash-bot"
+          git config user.email "actions@github.com"
+          if ! git diff --quiet; then
+            git add index.html
+            git commit -m "auto-fix: redirect root to admin panel"
+            git push
+          else
+            echo "No changes to commit."
+          fi
