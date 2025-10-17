@@ -23,21 +23,17 @@ jobs:
           body="${{ github.event.comment.body }}"
           echo "COMMAND=${body#ONAY: }" >> $GITHUB_ENV
 
-      - name: Apply command to panel.json
+      - name: Apply command to panel.json (bash only)
         run: |
           mkdir -p data
           if [ ! -f data/panel.json ]; then echo '{"dailyReport":{"urgent":[]}}' > data/panel.json; fi
-          node -e "
-          const fs=require('fs');
-          const d=JSON.parse(fs.readFileSync('data/panel.json'));
-          d.dailyReport.urgent.push(process.env.COMMAND);
-          fs.writeFileSync('data/panel.json',JSON.stringify(d,null,2));
-          "
+          tmp=$(mktemp)
+          jq --arg cmd "$COMMAND" '.dailyReport.urgent += [$cmd]' data/panel.json > "$tmp" && mv "$tmp" data/panel.json
 
       - name: Commit and Push
         run: |
           git config user.name 'github-actions'
           git config user.email 'actions@github.com'
           git add data/panel.json
-          git commit -m 'Auto apply ONAY update'
+          git commit -m "Auto apply ONAY update: $COMMAND" || echo "No changes to commit"
           git push
